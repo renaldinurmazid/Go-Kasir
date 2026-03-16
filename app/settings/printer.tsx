@@ -39,6 +39,7 @@ export default function PrinterSettingsScreen() {
       console.log("Check connection error:", error);
     }
   };
+  // perubahan
 
   const requestPermissions = async () => {
     if (Platform.OS === "android") {
