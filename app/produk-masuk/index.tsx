@@ -10,7 +10,7 @@ import {
   Alert,
   ActivityIndicator,
   RefreshControl,
-  Platform,
+  Pressable,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
@@ -29,6 +29,7 @@ type UserData = {
   id_user: number;
   nama_lengkap: string;
   id_mitra: number;
+  nama_toko?: string;
 };
 
 type ProdukOpsi = {
@@ -45,6 +46,8 @@ type ProdukMasukItem = {
   nama_produk: string;
   nama_lengkap: string;
   satuan?: string;
+  harga_beli?: number;
+  harga_jual?: number;
 };
 
 export default function ProdukMasukScreen() {
@@ -56,6 +59,7 @@ export default function ProdukMasukScreen() {
   const [filteredProduk, setFilteredProduk] = useState<ProdukOpsi[]>([]);
 
   const [loading, setLoading] = useState(true);
+  const [listLoading, setListLoading] = useState(false);
   const [submitLoading, setSubmitLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   
@@ -121,6 +125,8 @@ export default function ProdukMasukScreen() {
 
   const fetchList = async (id_mitra: number, isRefresh: boolean) => {
     if (isRefresh) setRefreshing(true);
+    else setListLoading(true);
+    
     const result = await getProdukMasukList({
       id_mitra, keyword,
       tanggal_awal: formatDateDb(dtAwal),
@@ -128,6 +134,7 @@ export default function ProdukMasukScreen() {
     });
     if (result.success) setItems(result.data || []);
     setRefreshing(false);
+    setListLoading(false);
   };
 
   const fetchProdukOpsi = async (id_mitra: number) => {
@@ -170,150 +177,311 @@ export default function ProdukMasukScreen() {
     setSelectedProdukId(null); setSelectedProdukName(""); setQtyMasuk("");
     setDtMasuk(new Date()); setSatuan(""); setHargaBeli(""); setHargaJual("");
     setCatatan(""); setSearchProduk("");
+    setShowProdukDropdown(false);
+  };
+
+  const closeModal = () => {
+    setShowModal(false);
+    resetForm();
   };
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backRow}>
-          <Ionicons name="arrow-back" size={22} color="#fff" />
-          <View style={{ marginLeft: 10 }}>
-            <Text style={styles.headerTitle}>Produk Masuk</Text>
-            <Text style={styles.headerSub}>Kelola stok masuk & harga</Text>
+      <View style={styles.topHeader}>
+        <View style={styles.headerTopRow}>
+          <TouchableOpacity 
+            onPress={() => router.back()} 
+            style={styles.headerIconButton}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="arrow-back" size={24} color={Colors.text} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Produk Masuk</Text>
+          <TouchableOpacity 
+            style={styles.headerAddButton} 
+            onPress={() => setShowModal(true)}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="add" size={20} color="#fff" />
+            <Text style={styles.headerAddButtonText}>Baru</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.searchSection}>
+          <View style={styles.searchBarWrapper}>
+            <Ionicons name="search" size={20} color={Colors.textSoft} style={styles.searchIcon} />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Cari produk..."
+              placeholderTextColor={Colors.textSoft}
+              value={keyword}
+              onChangeText={setKeyword}
+            />
           </View>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.addBtn} onPress={() => setShowModal(true)}>
-          <Text style={styles.addBtnText}>+ Tambah</Text>
-        </TouchableOpacity>
+          
+          <TouchableOpacity
+            style={styles.filterButton}
+            onPress={() => setPicker({ show: true, field: "awal" })}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="calendar-outline" size={18} color={Colors.primary} />
+            <Text style={styles.filterButtonText} numberOfLines={1}>
+              {formatDateIndo(dtAwal)}
+            </Text>
+          </TouchableOpacity>
+          <Text style={{ color: Colors.textSoft, fontSize: 12 }}>-</Text>
+          <TouchableOpacity
+            style={styles.filterButton}
+            onPress={() => setPicker({ show: true, field: "akhir" })}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="calendar-outline" size={18} color={Colors.primary} />
+            <Text style={styles.filterButtonText} numberOfLines={1}>
+              {formatDateIndo(dtAkhir)}
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
-      <ScrollView 
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => fetchList(userData?.id_mitra!, true)} />}
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => fetchList(userData?.id_mitra!, true)}
+            colors={[Colors.primary]}
+            tintColor={Colors.primary}
+          />
+        }
       >
-        {/* Filter */}
-        <View style={styles.filterCard}>
-          <TextInput style={styles.input} placeholder="Cari nama produk..." value={keyword} onChangeText={setKeyword} />
-          <View style={{ flexDirection: "row", gap: 10 }}>
-            <TouchableOpacity style={[styles.input, styles.dateBox]} onPress={() => setPicker({ show: true, field: "awal" })}>
-              <Text style={styles.dateText}>Dari: {formatDateIndo(dtAwal)}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.input, styles.dateBox]} onPress={() => setPicker({ show: true, field: "akhir" })}>
-              <Text style={styles.dateText}>Ke: {formatDateIndo(dtAkhir)}</Text>
-            </TouchableOpacity>
-          </View>
+        <View style={styles.listHeader}>
+          <Text style={styles.listHeaderText}>
+            Total {items.length} Riwayat Masuk
+          </Text>
+          <Text style={styles.listSubHeaderText}>
+            {userData?.nama_toko || "Semua Mitra"}
+          </Text>
         </View>
 
-        {/* List */}
-        <View style={styles.listContainer}>
-          {loading ? <ActivityIndicator color={Colors.primary} /> : 
-            items.map((item) => (
-              <View key={item.id_produk_masuk} style={styles.itemCard}>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                    <Text style={styles.itemTitle}>{item.nama_produk}</Text>
-                    <Text style={styles.qtyText}>+{item.qty_masuk}</Text>
+        {loading || (listLoading && items.length === 0) ? (
+          <View style={styles.loadingBox}>
+            <ActivityIndicator size="large" color={Colors.primary} />
+            <Text style={styles.loadingText}>Menyiapkan data...</Text>
+          </View>
+        ) : items.length > 0 ? (
+          items.map((item) => (
+            <View key={item.id_produk_masuk} style={styles.productCard}>
+              <View style={styles.cardHeader}>
+                <View style={styles.imageContainer}>
+                  <View style={styles.noImageBox}>
+                    <Ionicons name="download-outline" size={24} color="#CBD5E1" />
+                  </View>
                 </View>
-                <Text style={styles.itemText}>Tanggal: {item.tanggal_masuk} | {item.nama_lengkap}</Text>
-                {item.satuan && <Text style={styles.itemSubText}>Satuan: {item.satuan}</Text>}
+                
+                <View style={styles.cardMainInfo}>
+                  <View style={styles.titleRow}>
+                    <Text style={styles.productName} numberOfLines={1}>{item.nama_produk}</Text>
+                    <View style={styles.qtyBadge}>
+                      <Text style={styles.qtyBadgeText}>+{item.qty_masuk}</Text>
+                    </View>
+                  </View>
+                  <Text style={styles.productKategori}>{item.tanggal_masuk} • {item.nama_lengkap}</Text>
+                </View>
               </View>
-          ))}
-        </View>
+
+              <View style={styles.divider} />
+
+              <View style={styles.detailsGrid}>
+                <View style={styles.detailItem}>
+                  <Text style={styles.detailLabel}>Satuan</Text>
+                  <Text style={styles.detailValue}>{item.satuan || "-"}</Text>
+                </View>
+                <View style={styles.detailItem}>
+                  <Text style={styles.detailLabel}>Catatan</Text>
+                  <Text style={[styles.detailValue, { fontWeight: '500', fontSize: 12 }]} numberOfLines={1}>
+                    {item.catatan || "-"}
+                  </Text>
+                </View>
+              </View>
+            </View>
+          ))
+        ) : (
+          <View style={styles.emptyContainer}>
+            <View style={styles.emptyCircle}>
+              <Ionicons name="search" size={48} color="#E2E8F0" />
+            </View>
+            <Text style={styles.emptyTitle}>Data Tidak Ditemukan</Text>
+            <Text style={styles.emptySub}>Coba cari dengan kata kunci atau periode lain.</Text>
+          </View>
+        )}
+        <View style={{ height: 100 }} />
       </ScrollView>
 
-      {/* Modal Tambah */}
       <Modal visible={showModal} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalBox}>
+        <Pressable style={styles.modalOverlay} onPress={closeModal}>
+          <Pressable style={styles.modalBox} onPress={() => {}}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Tambah Stok Masuk</Text>
-              <TouchableOpacity onPress={() => { setShowModal(false); resetForm(); }}>
-                <Ionicons name="close-circle" size={28} color="#ccc" />
+              <TouchableOpacity onPress={closeModal} style={styles.headerIconButton}>
+                <Ionicons name="close" size={24} color={Colors.text} />
               </TouchableOpacity>
             </View>
 
-            <ScrollView showsVerticalScrollIndicator={false} nestedScrollEnabled={true}>
-              <Text style={styles.label}>Produk</Text>
-              <TouchableOpacity style={styles.dropdownBtn} onPress={() => setShowProdukDropdown(!showProdukDropdown)}>
-                <Text style={{color: selectedProdukName ? '#000' : '#999'}}>
-                    {selectedProdukName || "Pilih Produk..."}
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={{ paddingBottom: 40 }}
+            >
+              <Text style={styles.formLabel}>Pilih Produk</Text>
+              <View style={{ position: "relative", zIndex: 100 }}>
+                <TouchableOpacity
+                  style={styles.formDropdown}
+                  onPress={() => setShowProdukDropdown(!showProdukDropdown)}
+                >
+                  <Text
+                    style={[
+                      styles.formDropdownText,
+                      !selectedProdukName && { color: Colors.textSoft },
+                    ]}
+                  >
+                    {selectedProdukName || "Cari produk..."}
+                  </Text>
+                  <Ionicons name="chevron-down" size={18} color={Colors.textSoft} />
+                </TouchableOpacity>
+
+                {showProdukDropdown && (
+                  <View style={styles.formDropdownList}>
+                    <TextInput 
+                      style={styles.searchDropdown} 
+                      placeholder="Ketik nama produk..." 
+                      placeholderTextColor={Colors.textSoft}
+                      value={searchProduk}
+                      onChangeText={setSearchProduk}
+                    />
+                    <ScrollView style={{ maxHeight: 250 }} nestedScrollEnabled={true}>
+                      {filteredProduk.map((p) => (
+                        <TouchableOpacity 
+                          key={p.id_produk} 
+                          style={styles.formDropdownItem}
+                          onPress={() => {
+                              setSelectedProdukId(p.id_produk);
+                              setSelectedProdukName(p.nama_produk);
+                              setShowProdukDropdown(false);
+                          }}
+                        >
+                          <Text style={styles.formDropdownItemText}>
+                            {p.nama_produk} <Text style={{ color: Colors.textSoft, fontSize: 11 }}>(Stok: {p.stok})</Text>
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                      {filteredProduk.length === 0 && (
+                        <View style={{ padding: 16, alignItems: 'center' }}>
+                          <Text style={{ color: Colors.textSoft, fontSize: 12 }}>Produk tidak ditemukan</Text>
+                        </View>
+                      )}
+                    </ScrollView>
+                  </View>
+                )}
+              </View>
+
+              <Text style={styles.formLabel}>Tanggal Masuk</Text>
+              <TouchableOpacity 
+                style={styles.formInput} 
+                onPress={() => setPicker({ show: true, field: "masuk" })}
+              >
+                <Text style={{ marginTop: 14, color: Colors.text, fontWeight: '500' }}>
+                  {formatDateIndo(dtMasuk)}
                 </Text>
-                <Ionicons name="chevron-down" size={18} />
               </TouchableOpacity>
 
-              {showProdukDropdown && (
-                <View style={styles.dropdownListContainer}>
-                  <TextInput 
-                    style={styles.searchDropdown} 
-                    placeholder="Cari produk..." 
-                    value={searchProduk}
-                    onChangeText={setSearchProduk}
-                  />
-                  <ScrollView style={{ maxHeight: 200 }} nestedScrollEnabled={true}>
-                    {filteredProduk.map((p) => (
-                      <TouchableOpacity 
-                        key={p.id_produk} 
-                        style={styles.dropdownItem}
-                        onPress={() => {
-                            setSelectedProdukId(p.id_produk);
-                            setSelectedProdukName(p.nama_produk);
-                            setShowProdukDropdown(false);
-                        }}
-                      >
-                        <Text>{p.nama_produk} (Stok: {p.stok})</Text>
-                      </TouchableOpacity>
-                    ))}
-                  </ScrollView>
-                </View>
-              )}
-
-              <Text style={styles.label}>Tanggal Masuk</Text>
-              <TouchableOpacity style={styles.input} onPress={() => setPicker({ show: true, field: "masuk" })}>
-                <Text style={{ marginTop: 12 }}>{formatDateIndo(dtMasuk)}</Text>
-              </TouchableOpacity>
-
-              <View style={styles.row}>
+              <View style={{ flexDirection: "row", gap: 16 }}>
                 <View style={{ flex: 1.5 }}>
-                    <Text style={styles.label}>Qty</Text>
-                    <TextInput style={styles.input} keyboardType="numeric" value={qtyMasuk} onChangeText={setQtyMasuk} placeholder="0" />
+                  <Text style={styles.formLabel}>Qty Masuk</Text>
+                  <TextInput
+                    style={styles.formInput}
+                    keyboardType="numeric"
+                    value={qtyMasuk}
+                    onChangeText={setQtyMasuk}
+                    placeholder="0"
+                    placeholderTextColor={Colors.textSoft}
+                  />
                 </View>
                 <View style={{ flex: 1 }}>
-                    <Text style={styles.label}>Satuan</Text>
-                    <TextInput style={styles.input} value={satuan} onChangeText={setSatuan} placeholder="Pcs/Kg" />
+                  <Text style={styles.formLabel}>Satuan</Text>
+                  <TextInput
+                    style={styles.formInput}
+                    value={satuan}
+                    onChangeText={setSatuan}
+                    placeholder="Pcs/Kg"
+                    placeholderTextColor={Colors.textSoft}
+                  />
                 </View>
               </View>
 
-              <View style={styles.row}>
+              <View style={{ flexDirection: "row", gap: 16 }}>
                 <View style={{ flex: 1 }}>
-                    <Text style={styles.label}>Harga Beli</Text>
-                    <TextInput style={styles.input} keyboardType="numeric" value={hargaBeli} onChangeText={setHargaBeli} placeholder="Rp" />
+                  <Text style={styles.formLabel}>Harga Beli</Text>
+                  <TextInput
+                    style={styles.formInput}
+                    keyboardType="numeric"
+                    value={hargaBeli}
+                    onChangeText={setHargaBeli}
+                    placeholder="Rp 0"
+                    placeholderTextColor={Colors.textSoft}
+                  />
                 </View>
                 <View style={{ flex: 1 }}>
-                    <Text style={styles.label}>Harga Jual Baru</Text>
-                    <TextInput style={styles.input} keyboardType="numeric" value={hargaJual} onChangeText={setHargaJual} placeholder="Rp" />
+                  <Text style={styles.formLabel}>Harga Jual Baru</Text>
+                  <TextInput
+                    style={styles.formInput}
+                    keyboardType="numeric"
+                    value={hargaJual}
+                    onChangeText={setHargaJual}
+                    placeholder="Rp 0"
+                    placeholderTextColor={Colors.textSoft}
+                  />
                 </View>
               </View>
 
-              <Text style={styles.label}>Catatan</Text>
-              <TextInput style={[styles.input, { height: 60 }]} multiline value={catatan} onChangeText={setCatatan} />
+              <Text style={styles.formLabel}>Catatan (Opsional)</Text>
+              <TextInput
+                style={[styles.formInput, { height: 80, paddingTop: 12, textAlignVertical: 'top' }]}
+                multiline
+                value={catatan}
+                onChangeText={setCatatan}
+                placeholder="Misal: Dari Supplier A"
+                placeholderTextColor={Colors.textSoft}
+              />
 
-              <TouchableOpacity style={styles.submitBtn} onPress={handleSubmit} disabled={submitLoading}>
-                {submitLoading ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitBtnText}>Simpan Data</Text>}
+              <TouchableOpacity 
+                style={[styles.submitButton, submitLoading && styles.submitButtonDisabled]} 
+                onPress={handleSubmit}
+                disabled={submitLoading}
+              >
+                {submitLoading ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.submitButtonText}>Simpan Data Stok</Text>
+                )}
               </TouchableOpacity>
-              <View style={{ height: 20 }} />
             </ScrollView>
-          </View>
-        </View>
+          </Pressable>
+        </Pressable>
       </Modal>
 
       {picker.show && (
         <DateTimePicker
           value={picker.field === "awal" ? dtAwal : picker.field === "akhir" ? dtAkhir : dtMasuk}
           mode="date"
-          onChange={(e, d) => { setPicker({ show: false, field: "" }); if(d){
-            if(picker.field === "awal") setDtAwal(d);
-            else if(picker.field === "akhir") setDtAkhir(d);
-            else setDtMasuk(d);
-          }}}
+          onChange={(e, d) => { 
+            setPicker({ show: false, field: "" }); 
+            if(d){
+              if(picker.field === "awal") setDtAwal(d);
+              else if(picker.field === "akhir") setDtAkhir(d);
+              else setDtMasuk(d);
+            }
+          }}
         />
       )}
     </View>
@@ -321,33 +489,355 @@ export default function ProdukMasukScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#f8f9fa" },
-  header: { backgroundColor: Colors.primary, paddingTop: 50, paddingHorizontal: 16, paddingBottom: 20, flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  backRow: { flexDirection: "row", alignItems: "center" },
-  headerTitle: { color: "#fff", fontSize: 18, fontWeight: "bold" },
-  headerSub: { color: "#fff", fontSize: 11, opacity: 0.8 },
-  addBtn: { backgroundColor: "#fff", paddingHorizontal: 12, paddingVertical: 6, borderRadius: 15 },
-  addBtnText: { color: Colors.primary, fontWeight: "bold", fontSize: 12 },
-  filterCard: { backgroundColor: "#fff", margin: 12, borderRadius: 12, padding: 12, shadowColor: "#000", shadowOpacity: 0.1, elevation: 3 },
-  input: { borderWidth: 1, borderColor: "#eee", borderRadius: 8, height: 45, paddingHorizontal: 12, marginBottom: 10, backgroundColor: '#fcfcfc' },
-  dateBox: { flex: 1, justifyContent: 'center' },
-  dateText: { fontSize: 12, color: '#555' },
-  listContainer: { paddingHorizontal: 12 },
-  itemCard: { backgroundColor: "#fff", borderRadius: 10, padding: 15, marginBottom: 10, borderLeftWidth: 4, borderLeftColor: Colors.primary, elevation: 1 },
-  itemTitle: { fontSize: 14, fontWeight: "bold", color: "#333" },
-  qtyText: { fontWeight: "bold", color: Colors.primary },
-  itemText: { fontSize: 12, color: "#777", marginTop: 4 },
-  itemSubText: { fontSize: 11, color: "#999" },
-  modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "flex-end" },
-  modalBox: { backgroundColor: "#fff", borderTopLeftRadius: 25, borderTopRightRadius: 25, padding: 20, maxHeight: "90%" },
-  modalHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 15 },
-  modalTitle: { fontSize: 16, fontWeight: "bold" },
-  label: { fontSize: 12, fontWeight: "bold", marginBottom: 5, color: "#666" },
-  row: { flexDirection: 'row', gap: 10 },
-  dropdownBtn: { borderWidth: 1, borderColor: "#eee", height: 45, borderRadius: 8, justifyContent: "space-between", alignItems: "center", flexDirection: "row", paddingHorizontal: 12, marginBottom: 10, backgroundColor: '#fcfcfc' },
-  dropdownListContainer: { borderWidth: 1, borderColor: Colors.primary, borderRadius: 8, marginBottom: 10, backgroundColor: '#fff', overflow: 'hidden' },
-  searchDropdown: { height: 40, borderBottomWidth: 1, borderBottomColor: '#eee', paddingHorizontal: 10, fontSize: 13, backgroundColor: '#f9f9f9' },
-  dropdownItem: { padding: 12, borderBottomWidth: 1, borderBottomColor: "#f5f5f5" },
-  submitBtn: { backgroundColor: Colors.primary, height: 50, borderRadius: 10, justifyContent: "center", alignItems: "center", marginTop: 15 },
-  submitBtnText: { color: "#fff", fontWeight: "bold" }
+  container: {
+    flex: 1,
+    backgroundColor: "#F8FAFC",
+  },
+  topHeader: {
+    backgroundColor: "#fff",
+    paddingTop: 50,
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F1F5F9",
+  },
+  headerTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 20,
+  },
+  headerIconButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: "#F8FAFC",
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#F1F5F9",
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: "#1E293B",
+  },
+  headerAddButton: {
+    backgroundColor: Colors.primary,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    gap: 4,
+    shadowColor: Colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  headerAddButtonText: {
+    color: "#fff",
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  searchSection: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  searchBarWrapper: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F1F5F9",
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    height: 46,
+  },
+  searchIcon: {
+    marginRight: 8,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 14,
+    color: "#1E293B",
+    fontWeight: "500",
+  },
+  filterButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#fff",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    height: 46,
+    gap: 6,
+  },
+  filterButtonText: {
+    fontSize: 12,
+    color: "#475569",
+    fontWeight: "600",
+  },
+  scrollContent: {
+    padding: 20,
+  },
+  listHeader: {
+    marginBottom: 20,
+  },
+  listHeaderText: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: "#1E293B",
+  },
+  listSubHeaderText: {
+    fontSize: 13,
+    color: Colors.textSoft,
+    marginTop: 2,
+  },
+  productCard: {
+    backgroundColor: "#fff",
+    borderRadius: 20,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: "#F1F5F9",
+    shadowColor: "#0F172A",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.03,
+    shadowRadius: 10,
+    elevation: 2,
+  },
+  cardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  imageContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    overflow: "hidden",
+  },
+  noImageBox: {
+    width: "100%",
+    height: "100%",
+    backgroundColor: "#F8FAFC",
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#F1F5F9",
+  },
+  cardMainInfo: {
+    flex: 1,
+  },
+  titleRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 2,
+  },
+  productName: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#1E293B",
+    flex: 1,
+  },
+  qtyBadge: {
+    backgroundColor: "#F0FDF4",
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  qtyBadgeText: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: "#16A34A",
+  },
+  productKategori: {
+    fontSize: 12,
+    color: "#64748B",
+    fontWeight: "500",
+  },
+  divider: {
+    height: 1,
+    backgroundColor: "#F1F5F9",
+    marginVertical: 12,
+  },
+  detailsGrid: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  detailItem: {
+    flex: 1,
+  },
+  detailLabel: {
+    fontSize: 10,
+    color: "#94A3B8",
+    fontWeight: "600",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    marginBottom: 4,
+  },
+  detailValue: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#334155",
+  },
+  loadingBox: {
+    paddingVertical: 40,
+    alignItems: "center",
+  },
+  loadingText: {
+    marginTop: 12,
+    color: "#64748B",
+    fontSize: 14,
+  },
+  emptyContainer: {
+    paddingVertical: 80,
+    alignItems: "center",
+    paddingHorizontal: 40,
+  },
+  emptyCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: "#F1F5F9",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 20,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#1E293B",
+    marginBottom: 8,
+  },
+  emptySub: {
+    fontSize: 14,
+    color: "#64748B",
+    textAlign: "center",
+    lineHeight: 20,
+  },
+  // Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(15, 23, 42, 0.4)",
+    justifyContent: "flex-end",
+  },
+  modalBox: {
+    width: "100%",
+    backgroundColor: "#fff",
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    padding: 24,
+    maxHeight: "90%",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: -10 },
+    shadowOpacity: 0.1,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 24,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: "800",
+    color: "#1E293B",
+  },
+  formLabel: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#475569",
+    marginBottom: 8,
+    marginTop: 16,
+  },
+  formInput: {
+    backgroundColor: "#F8FAFC",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 14,
+    height: 50,
+    paddingHorizontal: 16,
+    fontSize: 14,
+    color: "#1E293B",
+    fontWeight: "500",
+  },
+  formDropdown: {
+    backgroundColor: "#F8FAFC",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 14,
+    height: 50,
+    paddingHorizontal: 16,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  formDropdownText: {
+    fontSize: 14,
+    color: "#1E293B",
+    fontWeight: "500",
+  },
+  formDropdownList: {
+    marginTop: 8,
+    backgroundColor: "#fff",
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    overflow: "hidden",
+    elevation: 10,
+    position: 'absolute',
+    top: 50,
+    left: 0,
+    right: 0,
+    zIndex: 1000,
+  },
+  searchDropdown: {
+    height: 46,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F1F5F9",
+    paddingHorizontal: 16,
+    fontSize: 14,
+    backgroundColor: "#fff",
+    color: "#1E293B",
+  },
+  formDropdownItem: {
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F1F5F9",
+  },
+  formDropdownItemText: {
+    fontSize: 14,
+    color: "#475569",
+    fontWeight: "500",
+  },
+  submitButton: {
+    backgroundColor: Colors.primary,
+    height: 56,
+    borderRadius: 16,
+    justifyContent: "center",
+    alignItems: "center",
+    marginTop: 32,
+    marginBottom: 20,
+    shadowColor: Colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  submitButtonDisabled: {
+    backgroundColor: "#CBD5E1",
+    shadowOpacity: 0,
+  },
+  submitButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "800",
+  },
 });

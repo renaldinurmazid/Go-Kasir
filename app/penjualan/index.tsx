@@ -182,25 +182,71 @@ export default function PenjualanScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.headerLeft}>
-          <Ionicons name="arrow-back" size={22} color="#fff" />
-          <View style={{ marginLeft: 8 }}>
-            <Text style={styles.headerTitle}>Penjualan</Text>
-            <Text style={styles.headerSub}>
-              Kasir: {userData?.nama_lengkap || "Admin"}
-            </Text>
+      <View style={styles.topHeader}>
+        <View style={styles.headerTopRow}>
+          <TouchableOpacity 
+            onPress={() => router.back()} 
+            style={styles.headerIconButton}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="arrow-back" size={24} color={Colors.text} />
+          </TouchableOpacity>
+          <View style={styles.headerTitleWrapper}>
+            <Text style={styles.headerTitle}>Transaksi Baru</Text>
+            <Text style={styles.headerSub}>Kasir: {userData?.nama_lengkap || "Admin"}</Text>
           </View>
-        </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.cartClearBtn} 
+            onPress={handleClearCart}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="trash-outline" size={20} color={Colors.primary} />
+          </TouchableOpacity>
+        </View>
 
-        <TouchableOpacity style={styles.payButton} onPress={handleBayar}>
-          <Text style={styles.payButtonText}>
-            Bayar {formatRupiah(totalAmount())} →
-          </Text>
-        </TouchableOpacity>
+        <View style={styles.searchSection}>
+          <View style={styles.searchBarWrapper}>
+            <Ionicons name="search" size={20} color="#94A3B8" style={styles.searchIcon} />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Cari produk / scan..."
+              placeholderTextColor="#94A3B8"
+              value={keyword}
+              onChangeText={setKeyword}
+            />
+          </View>
+        </View>
+
+        <ScrollView 
+          horizontal 
+          showsHorizontalScrollIndicator={false} 
+          contentContainerStyle={styles.categoryScroll}
+        >
+          {kategoriList.map((item) => (
+            <TouchableOpacity
+              key={item}
+              style={[
+                styles.categoryPill,
+                selectedKategori === item && styles.categoryPillActive,
+              ]}
+              onPress={() => setSelectedKategori(item)}
+            >
+              <Text
+                style={[
+                  styles.categoryPillText,
+                  selectedKategori === item && styles.categoryPillTextActive,
+                ]}
+              >
+                {item}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
       </View>
 
       <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -217,429 +263,422 @@ export default function PenjualanScreen() {
           />
         }
       >
-        <View style={styles.cartBox}>
-          <View style={styles.cartHeader}>
-            <Text style={[styles.cartHeaderText, { flex: 2.2 }]}>Produk</Text>
-            <Text style={[styles.cartHeaderText, { flex: 1.4 }]}>Jumlah</Text>
-            <Text style={[styles.cartHeaderText, { flex: 1 }]}>Diskon</Text>
-            <Text style={[styles.cartHeaderText, { flex: 1.5 }]}>Total</Text>
-            <Text style={[styles.cartHeaderText, { flex: 0.8 }]}>Aksi</Text>
-          </View>
-
-          <View style={styles.cartBody}>
-            {items.length === 0 ? (
-              <View style={styles.emptyCartBox}>
-                <Text style={styles.emptyCartText}>Keranjang masih kosong</Text>
-              </View>
-            ) : (
-              <ScrollView nestedScrollEnabled>
-                {items.map((item) => (
-                  <View key={item.id_produk} style={styles.cartRow}>
-                    <View style={{ flex: 2.2 }}>
-                      <Text style={styles.cartProductName}>{item.nama_produk}</Text>
-                      <Text style={styles.cartProductSub}>
-                        Harga: {formatRupiah(item.harga)}
-                      </Text>
-                    </View>
-
-                    <View style={[styles.cartCenter, { flex: 1.4 }]}>
-                      <View style={styles.qtyBox}>
-                        <TouchableOpacity
-                          style={styles.qtyBtn}
-                          onPress={() => decreaseQty(item.id_produk)}
-                        >
-                          <Text style={styles.qtyBtnText}>-</Text>
-                        </TouchableOpacity>
-
-                        <Text style={styles.qtyValue}>{item.qty}</Text>
-
-                        <TouchableOpacity
-                          style={styles.qtyBtn}
-                          onPress={() => increaseQty(item.id_produk)}
-                        >
-                          <Text style={styles.qtyBtnText}>+</Text>
-                        </TouchableOpacity>
-                      </View>
-                    </View>
-
-                    <View style={[styles.cartCenter, { flex: 1 }]}>
-                      <Text style={styles.cartProductSub}>{item.diskon}%</Text>
-                    </View>
-
-                    <View style={[styles.cartCenter, { flex: 1.5 }]}>
-                      <Text style={styles.cartProductTotal}>
-                        {formatRupiah(item.total)}
-                      </Text>
-                    </View>
-
-                    <View style={[styles.cartCenter, { flex: 0.8 }]}>
-                      <TouchableOpacity
-                        onPress={() => removeItem(item.id_produk)}
-                      >
-                        <Ionicons name="trash-outline" size={18} color={Colors.primary} />
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                ))}
-              </ScrollView>
-            )}
-          </View>
-
-          <View style={styles.cartFooter}>
-            <Text style={styles.cartFooterText}>
-              Item / Jumlah: {totalItems()} / {totalQty()}
-            </Text>
-
-            <View style={styles.cartFooterRight}>
-              <Text style={styles.cartFooterTotal}>{formatRupiah(totalAmount())}</Text>
-              <TouchableOpacity onPress={handleClearCart}>
-                <Ionicons name="trash-outline" size={20} color={Colors.primary} />
-              </TouchableOpacity>
-            </View>
-          </View>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Produk Tersedia</Text>
+          <Text style={styles.sectionBadge}>{products.length} Item</Text>
         </View>
-
-        <View style={styles.searchRow}>
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Cari produk / scan barcode"
-            placeholderTextColor={Colors.textSoft}
-            value={keyword}
-            onChangeText={setKeyword}
-          />
-        </View>
-
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.categoryRow}
-        >
-          {kategoriList.map((item) => (
-            <TouchableOpacity
-              key={item}
-              style={[
-                styles.categoryChip,
-                selectedKategori === item && styles.categoryChipActive,
-              ]}
-              onPress={() => setSelectedKategori(item)}
-            >
-              <Text
-                style={[
-                  styles.categoryChipText,
-                  selectedKategori === item && styles.categoryChipTextActive,
-                ]}
-              >
-                {item}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
 
         <View style={styles.productGrid}>
           {loading ? (
             <View style={styles.loadingBox}>
               <ActivityIndicator size="large" color={Colors.primary} />
-              <Text style={styles.loadingText}>Memuat produk...</Text>
+              <Text style={styles.loadingText}>Menyiapkan produk...</Text>
             </View>
           ) : products.length === 0 ? (
-            <View style={styles.loadingBox}>
-              <Text style={styles.loadingText}>Produk tidak ditemukan.</Text>
+            <View style={styles.emptyContainer}>
+              <Ionicons name="cube-outline" size={48} color="#E2E8F0" />
+              <Text style={styles.emptyTitle}>Produk Kosong</Text>
+              <Text style={styles.emptySub}>Tidak ada produk aktif dengan stok tersedia.</Text>
             </View>
           ) : (
             products.map((item) => (
-              <View key={item.id_produk} style={styles.productCard}>
-                {item.gambar ? (
-                  <Image source={{ uri: item.gambar }} style={styles.productImage} />
-                ) : (
-                  <View style={styles.noImageBox}>
-                    <Ionicons name="image-outline" size={20} color="#aaa" />
+              <TouchableOpacity 
+                key={item.id_produk} 
+                style={styles.productCard}
+                activeOpacity={0.9}
+                onPress={() =>
+                  addItem({
+                    id_produk: item.id_produk,
+                    nama_produk: item.nama_produk,
+                    harga: item.harga,
+                    diskon: item.diskon,
+                    gambar: item.gambar,
+                    kategori: item.kategori,
+                  })
+                }
+              >
+                <View style={styles.productImageContainer}>
+                  {item.gambar ? (
+                    <Image source={{ uri: item.gambar }} style={styles.productImage} />
+                  ) : (
+                    <View style={styles.noImageBox}>
+                      <Ionicons name="image-outline" size={24} color="#CBD5E1" />
+                    </View>
+                  )}
+                  {item.diskon > 0 && (
+                    <View style={styles.productDiscountBadge}>
+                      <Text style={styles.productDiscountText}>{item.diskon}%</Text>
+                    </View>
+                  )}
+                </View>
+
+                <View style={styles.productInfo}>
+                  <Text style={styles.productName} numberOfLines={2}>{item.nama_produk}</Text>
+                  <Text style={styles.productPrice}>{formatRupiah(item.harga)}</Text>
+                  <View style={styles.productFooter}>
+                    <Text style={styles.productStock}>Stok: {item.stok}</Text>
+                    <View style={styles.addBtnCircle}>
+                      <Ionicons name="add" size={18} color="#fff" />
+                    </View>
                   </View>
-                )}
-
-                <Text style={styles.productName}>{item.nama_produk}</Text>
-                <Text style={styles.productPrice}>{formatRupiah(item.harga)}</Text>
-                <Text style={styles.productCategory}>{item.kategori || "-"}</Text>
-
-                <TouchableOpacity
-                  style={styles.addBtn}
-                  onPress={() =>
-                    addItem({
-                      id_produk: item.id_produk,
-                      nama_produk: item.nama_produk,
-                      harga: item.harga,
-                      diskon: item.diskon,
-                      gambar: item.gambar,
-                      kategori: item.kategori,
-                    })
-                  }
-                >
-                  <Text style={styles.addBtnText}>Tambah</Text>
-                </TouchableOpacity>
-              </View>
+                </View>
+              </TouchableOpacity>
             ))
           )}
         </View>
-
-        <View style={{ height: 24 }} />
+        <View style={{ height: 160 }} />
       </ScrollView>
+
+      {/* Cart Summary Panel */}
+      {items.length > 0 && (
+        <View style={styles.bottomCheckoutBar}>
+          <TouchableOpacity 
+            style={styles.cartSummaryTrigger}
+            onPress={() => {
+              // Toggle cart list detail logic can go here if needed
+              // For now, let's keep it clean
+            }}
+          >
+            <View style={styles.cartBadgeWrapper}>
+              <View style={styles.cartIconCircle}>
+                <Ionicons name="cart" size={20} color={Colors.primary} />
+              </View>
+              <View style={styles.cartCountBadge}>
+                <Text style={styles.cartCountText}>{totalQty()}</Text>
+              </View>
+            </View>
+            <View style={styles.cartPrices}>
+              <Text style={styles.cartTotalLabel}>{totalItems()} Item Terpilih</Text>
+              <Text style={styles.cartTotalPrice}>{formatRupiah(totalAmount())}</Text>
+            </View>
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={styles.checkoutBtn} 
+            onPress={handleBayar}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.checkoutBtnText}>Bayar Sekarang</Text>
+            <Ionicons name="chevron-forward" size={18} color="#fff" />
+          </TouchableOpacity>
+        </View>
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.background },
-
-  header: {
-    backgroundColor: Colors.primary,
-    paddingTop: 44,
-    paddingHorizontal: 14,
+  container: {
+    flex: 1,
+    backgroundColor: "#F8FAFC",
+  },
+  topHeader: {
+    backgroundColor: "#fff",
+    paddingTop: 60,
     paddingBottom: 16,
+    paddingHorizontal: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F1F5F9",
+    zIndex: 100,
+  },
+  headerTopRow: {
     flexDirection: "row",
+    alignItems: "center",
     justifyContent: "space-between",
+    marginBottom: 20,
+  },
+  headerIconButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 12,
+    backgroundColor: "#F1F5F9",
+    justifyContent: "center",
     alignItems: "center",
   },
-  headerLeft: {
-    flexDirection: "row",
-    alignItems: "center",
+  headerTitleWrapper: {
     flex: 1,
+    marginLeft: 12,
   },
   headerTitle: {
-    color: "#fff",
-    fontSize: 18,
-    fontWeight: "700",
+    fontSize: 20,
+    fontWeight: "800",
+    color: "#1E293B",
+    letterSpacing: -0.5,
   },
   headerSub: {
-    color: "#fff",
     fontSize: 12,
-    marginTop: 2,
+    color: "#64748B",
+    fontWeight: "500",
   },
-  payButton: {
-    backgroundColor: "#fff",
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 18,
-  },
-  payButtonText: {
-    color: Colors.primary,
-    fontWeight: "700",
-    fontSize: 13,
-  },
-
-  cartBox: {
-    margin: 12,
-    backgroundColor: "#fff",
+  cartClearBtn: {
+    width: 42,
+    height: 42,
     borderRadius: 12,
-    overflow: "hidden",
+    backgroundColor: "#FEF2F2",
+    justifyContent: "center",
+    alignItems: "center",
   },
-  cartHeader: {
-    backgroundColor: Colors.primary,
+  searchSection: {
+    marginBottom: 16,
+  },
+  searchBarWrapper: {
     flexDirection: "row",
-    paddingVertical: 10,
-    paddingHorizontal: 8,
+    alignItems: "center",
+    backgroundColor: "#F1F5F9",
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    height: 44,
   },
-  cartHeaderText: {
-    color: "#fff",
-    fontWeight: "700",
-    fontSize: 12,
-    textAlign: "center",
+  searchIcon: {
+    marginRight: 8,
   },
-  cartBody: {
-    height: 220,
-    paddingHorizontal: 8,
-    paddingVertical: 8,
-  },
-  emptyCartBox: {
+  searchInput: {
     flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
+    fontSize: 14,
+    color: "#1E293B",
+    fontWeight: "500",
   },
-  emptyCartText: {
-    color: "#777",
+  categoryScroll: {
+    gap: 8,
+    paddingBottom: 4,
   },
-  cartRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: "#eee",
-  },
-  cartProductName: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: Colors.text,
-  },
-  cartProductSub: {
-    fontSize: 11,
-    color: "#666",
-    marginTop: 2,
-  },
-  cartProductTotal: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: Colors.text,
-    textAlign: "center",
-  },
-  cartCenter: {
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  qtyBox: {
-    flexDirection: "row",
-    alignItems: "center",
+  categoryPill: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: "#F1F5F9",
     borderWidth: 1,
-    borderColor: "#ddd",
-    borderRadius: 12,
-    overflow: "hidden",
+    borderColor: "transparent",
   },
-  qtyBtn: {
-    width: 28,
-    height: 28,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#F5F5F5",
+  categoryPillActive: {
+    backgroundColor: "#FEF2F2",
+    borderColor: Colors.primary,
   },
-  qtyBtnText: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: Colors.text,
+  categoryPillText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#64748B",
   },
-  qtyValue: {
-    width: 28,
-    textAlign: "center",
-    fontSize: 12,
-    fontWeight: "700",
+  categoryPillTextActive: {
+    color: Colors.primary,
   },
-  cartFooter: {
-    borderTopWidth: 1,
-    borderTopColor: "#eee",
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+  scrollContent: {
+    paddingHorizontal: 16,
+    paddingTop: 20,
+  },
+  sectionHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+    marginBottom: 16,
+    paddingHorizontal: 4,
   },
-  cartFooterText: {
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: "#1E293B",
+  },
+  sectionBadge: {
     fontSize: 12,
-    color: Colors.text,
-    fontWeight: "600",
-  },
-  cartFooterRight: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-  },
-  cartFooterTotal: {
-    fontSize: 14,
     fontWeight: "700",
-    color: Colors.primary,
+    color: "#64748B",
+    backgroundColor: "#F1F5F9",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
   },
-
-  searchRow: {
-    paddingHorizontal: 12,
-  },
-  searchInput: {
-    backgroundColor: "#fff",
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: "#ddd",
-    height: 44,
-    paddingHorizontal: 14,
-    color: Colors.text,
-  },
-
-  categoryRow: {
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    gap: 8,
-  },
-  categoryChip: {
-    backgroundColor: "#fff",
-    borderWidth: 1,
-    borderColor: "#ddd",
-    borderRadius: 18,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-  },
-  categoryChipActive: {
-    backgroundColor: Colors.primary,
-    borderColor: Colors.primary,
-  },
-  categoryChipText: {
-    color: Colors.text,
-    fontSize: 12,
-    fontWeight: "600",
-  },
-  categoryChipTextActive: {
-    color: "#fff",
-  },
-
   productGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    paddingHorizontal: 8,
+    justifyContent: "space-between",
   },
   productCard: {
-    width: "46%",
     backgroundColor: "#fff",
-    margin: "2%",
-    borderRadius: 12,
-    padding: 10,
-    alignItems: "center",
+    width: "48%",
+    borderRadius: 20,
+    marginBottom: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.03,
+    shadowRadius: 8,
+    elevation: 2,
+    borderWidth: 1,
+    borderColor: "#F1F5F9",
+    overflow: "hidden",
+  },
+  productImageContainer: {
+    width: "100%",
+    height: 120,
+    backgroundColor: "#F8FAFC",
+    position: "relative",
   },
   productImage: {
-    width: 72,
-    height: 72,
-    borderRadius: 12,
-    marginBottom: 10,
+    width: "100%",
+    height: "100%",
+    resizeMode: "cover",
   },
   noImageBox: {
-    width: 72,
-    height: 72,
-    borderRadius: 12,
-    marginBottom: 10,
-    backgroundColor: "#F1F1F1",
+    flex: 1,
     justifyContent: "center",
     alignItems: "center",
+  },
+  productDiscountBadge: {
+    position: "absolute",
+    top: 8,
+    right: 8,
+    backgroundColor: Colors.primary,
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  productDiscountText: {
+    color: "#fff",
+    fontSize: 10,
+    fontWeight: "800",
+  },
+  productInfo: {
+    padding: 12,
   },
   productName: {
     fontSize: 13,
     fontWeight: "700",
-    textAlign: "center",
-    color: Colors.text,
-    minHeight: 34,
+    color: "#1E293B",
+    height: 36,
+    lineHeight: 18,
+    marginBottom: 6,
   },
   productPrice: {
-    fontSize: 12,
+    fontSize: 14,
+    fontWeight: "800",
     color: Colors.primary,
-    marginTop: 4,
-    fontWeight: "700",
+    marginBottom: 8,
   },
-  productCategory: {
+  productFooter: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  productStock: {
     fontSize: 11,
-    color: "#666",
-    marginTop: 4,
-    textAlign: "center",
+    color: "#94A3B8",
+    fontWeight: "600",
   },
-  addBtn: {
-    marginTop: 10,
+  addBtnCircle: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     backgroundColor: Colors.primary,
-    borderRadius: 16,
-    paddingHorizontal: 18,
-    paddingVertical: 8,
+    justifyContent: "center",
+    alignItems: "center",
   },
-  addBtnText: {
+  bottomCheckoutBar: {
+    position: "absolute",
+    bottom: 24,
+    left: 20,
+    right: 20,
+    backgroundColor: "#fff",
+    height: 80,
+    borderRadius: 24,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.15,
+    shadowRadius: 20,
+    elevation: 10,
+    borderWidth: 1,
+    borderColor: "#F1F5F9",
+  },
+  cartSummaryTrigger: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  cartBadgeWrapper: {
+    position: "relative",
+    marginRight: 12,
+  },
+  cartIconCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: "#FEF2F2",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  cartCountBadge: {
+    position: "absolute",
+    top: -4,
+    right: -4,
+    backgroundColor: Colors.primary,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 4,
+    borderWidth: 2,
+    borderColor: "#fff",
+  },
+  cartCountText: {
     color: "#fff",
-    fontSize: 12,
+    fontSize: 9,
+    fontWeight: "800",
+  },
+  cartPrices: {
+    flex: 1,
+  },
+  cartTotalLabel: {
+    fontSize: 11,
+    color: "#64748B",
+    fontWeight: "600",
+  },
+  cartTotalPrice: {
+    fontSize: 15,
+    fontWeight: "800",
+    color: "#1E293B",
+  },
+  checkoutBtn: {
+    backgroundColor: Colors.primary,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 16,
+    gap: 6,
+  },
+  checkoutBtnText: {
+    color: "#fff",
+    fontSize: 14,
     fontWeight: "700",
   },
-
   loadingBox: {
     width: "100%",
+    paddingVertical: 60,
     alignItems: "center",
-    paddingVertical: 30,
   },
   loadingText: {
-    marginTop: 10,
-    color: "#666",
+    marginTop: 12,
+    fontSize: 14,
+    color: "#64748B",
+    fontWeight: "500",
+  },
+  emptyContainer: {
+    width: "100%",
+    paddingVertical: 80,
+    alignItems: "center",
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#1E293B",
+    marginVertical: 8,
+  },
+  emptySub: {
+    fontSize: 14,
+    color: "#64748B",
+    textAlign: "center",
+    paddingHorizontal: 40,
   },
 });

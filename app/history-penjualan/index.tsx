@@ -10,6 +10,7 @@ import {
   Alert,
   Modal,
   RefreshControl,
+  Pressable,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
@@ -31,6 +32,7 @@ type UserData = {
   id_user: number;
   nama_lengkap: string;
   id_mitra: number;
+  nama_toko?: string;
 };
 
 type HistoryItem = {
@@ -52,11 +54,16 @@ type DetailItem = {
   total: number;
 };
 
+function formatRupiah(value: number) {
+  return `Rp ${Number(value || 0).toLocaleString("id-ID")}`;
+}
+
 export default function HistoryPenjualanScreen() {
   const router = useRouter();
 
   const [userData, setUserData] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [listLoading, setListLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
   // Filter State
@@ -87,7 +94,6 @@ export default function HistoryPenjualanScreen() {
     return () => clearTimeout(timer);
   }, [keyword, metode, dtAwal, dtAkhir]);
 
-  const formatRupiah = (val: number) => `Rp ${Number(val || 0).toLocaleString("id-ID")}`;
   const formatDateDb = (date: Date) => date.toISOString().split("T")[0];
   const formatDateIndo = (date: Date) => date.toLocaleDateString("id-ID", { day: '2-digit', month: '2-digit', year: 'numeric' });
 
@@ -96,14 +102,17 @@ export default function HistoryPenjualanScreen() {
       setLoading(true);
       const storedUser = await AsyncStorage.getItem("user_data");
       if (!storedUser) { router.replace("/login"); return; }
-      setUserData(JSON.parse(storedUser));
-      await fetchHistory(JSON.parse(storedUser).id_mitra, false);
+      const user = JSON.parse(storedUser);
+      setUserData(user);
+      await fetchHistory(user.id_mitra, false);
     } catch (e) { Alert.alert("Error", "Gagal memuat data"); }
     finally { setLoading(false); }
   };
 
   const fetchHistory = async (id_mitra: number, isRefresh: boolean) => {
     if (isRefresh) setRefreshing(true);
+    else setListLoading(true);
+    
     try {
       const result = await getHistoryPenjualan({
         id_mitra,
@@ -130,7 +139,10 @@ export default function HistoryPenjualanScreen() {
         setSummary(sum);
       }
     } catch (e) { console.log("Fetch Error"); }
-    finally { setRefreshing(false); }
+    finally { 
+        setRefreshing(false); 
+        setListLoading(false);
+    }
   };
 
   const handleOpenDetail = async (id_penjualan: number) => {
@@ -152,122 +164,224 @@ export default function HistoryPenjualanScreen() {
       if (!detailHeader) return;
       const dataStruk = { ...detailHeader, items: detailItems, kasir: detailHeader.nama_lengkap };
       const text = buildStrukText(dataStruk);
-      const result = await printStruk(text);
-      if (result.success) Alert.alert("Preview Struk", result.preview);
+      const result = await printStruk(text, detailHeader?.logo || null);
+      if (result.success) Alert.alert("Selesai", "Struk berhasil dicetak (Preview di Log)");
     } catch (error) { Alert.alert("Error", "Printer tidak merespon"); }
   };
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backRow}>
-          <Ionicons name="arrow-back" size={22} color="#fff" />
-          <View style={{ marginLeft: 8 }}>
-            <Text style={styles.headerTitle}>History Penjualan</Text>
-            <Text style={styles.headerSub}>Ringkasan & riwayat transaksi</Text>
-          </View>
-        </TouchableOpacity>
-      </View>
+      <View style={styles.topHeader}>
+        <View style={styles.headerTopRow}>
+          <TouchableOpacity 
+            onPress={() => router.back()} 
+            style={styles.headerIconButton}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="arrow-back" size={24} color={Colors.text} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>History Penjualan</Text>
+          <View style={{ width: 40 }} />
+        </View>
 
-      <ScrollView refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => fetchHistory(userData?.id_mitra!, true)} />}>
+        <View style={styles.searchSection}>
+          <View style={styles.searchBarWrapper}>
+            <Ionicons name="search" size={20} color={Colors.textSoft} style={styles.searchIcon} />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Cari transaksi..."
+              placeholderTextColor={Colors.textSoft}
+              value={keyword}
+              onChangeText={setKeyword}
+            />
+          </View>
+          
+          <TouchableOpacity
+            style={styles.filterButton}
+            onPress={() => setShowPicker({ show: true, field: "awal" })}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="calendar-outline" size={18} color={Colors.primary} />
+            <Text style={styles.filterButtonText} numberOfLines={1}>
+              {formatDateIndo(dtAwal)}
+            </Text>
+          </TouchableOpacity>
+        </View>
         
-        {/* Summary Per Cara Bayar */}
-        <View style={styles.summarySection}>
-          <View style={styles.summaryItem}>
-             <Text style={styles.summaryLabel}>TUNAI</Text>
-             <Text style={styles.summaryValue}>{formatRupiah(summary.tunai)}</Text>
-          </View>
-          <View style={styles.summaryItem}>
-             <Text style={styles.summaryLabel}>BANK/QRIS</Text>
-             <Text style={styles.summaryValue}>{formatRupiah(summary.bank + summary.qris)}</Text>
-          </View>
-          <View style={[styles.summaryItem, { borderBottomWidth: 0, marginTop: 5, paddingTop: 5, borderTopWidth: 1, borderTopColor: '#eee' }]}>
-             <Text style={[styles.summaryLabel, { fontWeight: 'bold', color: Colors.primary }]}>TOTAL</Text>
-             <Text style={[styles.summaryValue, { color: Colors.primary }]}>{formatRupiah(summary.total)}</Text>
-          </View>
-        </View>
-
-        {/* Filter Section */}
-        <View style={styles.filterCard}>
-          <TextInput style={styles.input} placeholder="Cari No. Transaksi..." value={keyword} onChangeText={setKeyword} />
-          <View style={styles.row}>
-            <TouchableOpacity style={[styles.input, styles.dateInput]} onPress={() => setShowPicker({ show: true, field: "awal" })}>
-              <Text style={styles.dateText}>{formatDateIndo(dtAwal)}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.input, styles.dateInput]} onPress={() => setShowPicker({ show: true, field: "akhir" })}>
-              <Text style={styles.dateText}>{formatDateIndo(dtAkhir)}</Text>
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.metodeContainer}>
-            {['', 'tunai', 'bank', 'qris'].map((m) => (
-              <TouchableOpacity 
-                key={m} 
-                style={[styles.metodeBadge, metode === m && styles.metodeActive]} 
-                onPress={() => setMetode(m)}
-              >
-                <Text style={[styles.metodeText, metode === m && styles.metodeTextActive]}>
-                    {m === '' ? 'Semua' : m.toUpperCase()}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-
-        {/* List Section */}
-        <View style={styles.listCard}>
-          {loading ? <ActivityIndicator color={Colors.primary} style={{ marginTop: 20 }} /> : items.map((item) => (
-            <TouchableOpacity key={item.id_penjualan} style={styles.itemCard} onPress={() => handleOpenDetail(item.id_penjualan)}>
-              <View style={styles.itemTopRow}>
-                <Text style={styles.invoiceText}>#{item.id_penjualan}</Text>
-                <Text style={styles.methodBadge}>{item.metode_pembayaran.toUpperCase()}</Text>
-              </View>
-              <Text style={styles.itemText}>{item.tanggal} • {item.nama_lengkap}</Text>
-              <Text style={styles.itemTotalText}>{formatRupiah(item.total)}</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.metodeScroll}>
+          {['', 'tunai', 'bank', 'qris'].map((m) => (
+            <TouchableOpacity 
+              key={m} 
+              style={[styles.metodePill, metode === m && styles.metodePillActive]} 
+              onPress={() => setMetode(m)}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.metodePillText, metode === m && styles.metodePillTextActive]}>
+                {m === '' ? 'Semua' : m.toUpperCase()}
+              </Text>
             </TouchableOpacity>
           ))}
+        </ScrollView>
+      </View>
+
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => fetchHistory(userData?.id_mitra!, true)}
+            colors={[Colors.primary]}
+            tintColor={Colors.primary}
+          />
+        }
+      >
+        {/* Summary Info Boxes */}
+        <View style={styles.summaryGrid}>
+          <View style={styles.summaryBox}>
+            <Text style={styles.summaryLabel}>Total Omzet</Text>
+            <Text style={styles.summaryValue}>{formatRupiah(summary.total)}</Text>
+          </View>
+          <View style={styles.summaryBox}>
+            <Text style={styles.summaryLabel}>Tunai</Text>
+            <Text style={[styles.summaryValue, { color: '#16A34A' }]}>{formatRupiah(summary.tunai)}</Text>
+          </View>
+          <View style={styles.summaryBox}>
+            <Text style={styles.summaryLabel}>Non-Tunai</Text>
+            <Text style={[styles.summaryValue, { color: '#2563EB' }]}>{formatRupiah(summary.bank + summary.qris)}</Text>
+          </View>
         </View>
+
+        <View style={styles.listHeader}>
+          <Text style={styles.listHeaderText}>
+            {items.length} Transaksi Ditemukan
+          </Text>
+          <Text style={styles.listSubHeaderText}>
+            {userData?.nama_toko || "Semua Mitra"}
+          </Text>
+        </View>
+
+        {loading || (listLoading && items.length === 0) ? (
+          <View style={styles.loadingBox}>
+            <ActivityIndicator size="large" color={Colors.primary} />
+            <Text style={styles.loadingText}>Memuat history...</Text>
+          </View>
+        ) : items.length > 0 ? (
+          items.map((item) => (
+            <TouchableOpacity 
+              key={item.id_penjualan} 
+              style={styles.transactionCard}
+              onPress={() => handleOpenDetail(item.id_penjualan)}
+              activeOpacity={0.7}
+            >
+              <View style={styles.cardHeader}>
+                <View style={styles.iconContainer}>
+                  <Ionicons name="receipt-outline" size={24} color={Colors.primary} />
+                </View>
+                
+                <View style={styles.cardMainInfo}>
+                  <View style={styles.titleRow}>
+                    <Text style={styles.invoiceNo}>#{item.id_penjualan}</Text>
+                    <View style={[
+                      styles.methodBadge,
+                      { backgroundColor: item.metode_pembayaran.toLowerCase() === 'tunai' ? '#F0FDF4' : '#EFF6FF' }
+                    ]}>
+                      <Text style={[
+                        styles.methodBadgeText,
+                        { color: item.metode_pembayaran.toLowerCase() === 'tunai' ? '#16A34A' : '#2563EB' }
+                      ]}>
+                        {item.metode_pembayaran.toUpperCase()}
+                      </Text>
+                    </View>
+                  </View>
+                  <Text style={styles.cardSubText}>{item.tanggal} • {item.nama_lengkap}</Text>
+                </View>
+              </View>
+
+              <View style={styles.divider} />
+
+              <View style={styles.amountRow}>
+                <Text style={styles.amountLabel}>Total Pembayaran</Text>
+                <Text style={styles.amountValue}>{formatRupiah(item.total)}</Text>
+              </View>
+            </TouchableOpacity>
+          ))
+        ) : (
+          <View style={styles.emptyContainer}>
+            <View style={styles.emptyCircle}>
+              <Ionicons name="search" size={48} color="#E2E8F0" />
+            </View>
+            <Text style={styles.emptyTitle}>Transaksi Tidak Ditemukan</Text>
+            <Text style={styles.emptySub}>Coba cari dengan kata kunci atau periode lain.</Text>
+          </View>
+        )}
+        <View style={{ height: 100 }} />
       </ScrollView>
 
       {/* Modal Detail */}
       <Modal visible={showDetailModal} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalBox}>
+        <Pressable style={styles.modalOverlay} onPress={() => setShowDetailModal(false)}>
+          <Pressable style={styles.modalBox} onPress={() => {}}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Detail Transaksi</Text>
-              <TouchableOpacity onPress={() => setShowDetailModal(false)}>
-                <Ionicons name="close-circle" size={28} color="#ccc" />
+              <TouchableOpacity onPress={() => setShowDetailModal(false)} style={styles.headerIconButton}>
+                <Ionicons name="close" size={24} color={Colors.text} />
               </TouchableOpacity>
             </View>
 
-            {detailLoading ? <ActivityIndicator color={Colors.primary} /> : (
-              <ScrollView showsVerticalScrollIndicator={false}>
+            {detailLoading ? (
+              <View style={{ padding: 40, alignItems: 'center' }}>
+                <ActivityIndicator color={Colors.primary} />
+              </View>
+            ) : (
+              <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
                 {detailHeader && (
-                  <View style={styles.detailHeaderBox}>
-                    <Text style={styles.detailText}>No: #{detailHeader.id_penjualan}</Text>
-                    <Text style={styles.detailText}>Kasir: {detailHeader.nama_lengkap}</Text>
-                    <Text style={[styles.detailText, { fontWeight: 'bold', color: Colors.primary }]}>Total: {formatRupiah(detailHeader.total)}</Text>
+                  <View style={styles.detailHeaderSection}>
+                    <View style={styles.detailInfoItem}>
+                      <Text style={styles.detailLabel}>No. Invoice</Text>
+                      <Text style={styles.detailValue}>#{detailHeader.id_penjualan}</Text>
+                    </View>
+                    <View style={styles.detailInfoItem}>
+                      <Text style={styles.detailLabel}>Tanggal</Text>
+                      <Text style={styles.detailValue}>{detailHeader.tanggal}</Text>
+                    </View>
+                    <View style={styles.detailInfoItem}>
+                      <Text style={styles.detailLabel}>Kasir</Text>
+                      <Text style={styles.detailValue}>{detailHeader.nama_lengkap}</Text>
+                    </View>
                   </View>
                 )}
-                <View style={{ marginTop: 15 }}>
-                  {detailItems.map((item) => (
-                    <View key={item.id_detail} style={styles.detailItemRow}>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.detailItemName}>{item.nama_produk}</Text>
-                        <Text style={styles.detailItemSub}>{item.qty} x {formatRupiah(item.harga)}</Text>
-                      </View>
-                      <Text style={styles.detailItemTotal}>{formatRupiah(item.total)}</Text>
+
+                <Text style={styles.sectionTitle}>Item Terjual</Text>
+                {detailItems.map((item) => (
+                  <View key={item.id_detail} style={styles.detailItemRow}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.itemName}>{item.nama_produk}</Text>
+                      <Text style={styles.itemSub}>{item.qty} x {formatRupiah(item.harga)}</Text>
                     </View>
-                  ))}
+                    <Text style={styles.itemTotal}>{formatRupiah(item.total)}</Text>
+                  </View>
+                ))}
+
+                <View style={styles.totalSection}>
+                   <View style={styles.totalRow}>
+                      <Text style={styles.totalLabel}>Grand Total</Text>
+                      <Text style={styles.totalValue}>{formatRupiah(detailHeader?.total)}</Text>
+                   </View>
+                   <View style={styles.totalRow}>
+                      <Text style={styles.paymentLabel}>Metode Bayar</Text>
+                      <Text style={styles.paymentValue}>{detailHeader?.metode_pembayaran?.toUpperCase()}</Text>
+                   </View>
                 </View>
-                <TouchableOpacity style={styles.printBtn} onPress={handlePrintUlang}>
-                  <Ionicons name="print" size={20} color="#fff" />
-                  <Text style={styles.printBtnText}>Cetak Ulang Struk</Text>
+
+                <TouchableOpacity style={styles.submitButton} onPress={handlePrintUlang}>
+                  <Ionicons name="print" size={22} color="#fff" style={{ marginRight: 8 }} />
+                  <Text style={styles.submitButtonText}>Cetak Ulang Struk</Text>
                 </TouchableOpacity>
               </ScrollView>
             )}
-          </View>
-        </View>
+          </Pressable>
+        </Pressable>
       </Modal>
 
       {showPicker.show && (
@@ -288,47 +402,391 @@ export default function HistoryPenjualanScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#f4f6f8" },
-  header: { backgroundColor: Colors.primary, paddingTop: 50, paddingHorizontal: 16, paddingBottom: 20 },
-  backRow: { flexDirection: "row", alignItems: "center" },
-  headerTitle: { color: "#fff", fontSize: 18, fontWeight: "700" },
-  headerSub: { color: "#fff", fontSize: 12, opacity: 0.8 },
-  
-  summarySection: { backgroundColor: "#fff", margin: 12, borderRadius: 15, padding: 15, elevation: 2 },
-  summaryItem: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4 },
-  summaryLabel: { fontSize: 12, color: '#666' },
-  summaryValue: { fontSize: 13, fontWeight: 'bold', color: '#333' },
-
-  filterCard: { backgroundColor: "#fff", marginHorizontal: 12, borderRadius: 15, padding: 15, elevation: 1 },
-  row: { flexDirection: 'row', gap: 10 },
-  input: { borderWidth: 1, borderColor: "#eee", borderRadius: 10, height: 45, paddingHorizontal: 12, marginBottom: 10, backgroundColor: '#fafafa' },
-  dateInput: { flex: 1, justifyContent: 'center' },
-  dateText: { fontSize: 12, color: '#444' },
-  
-  metodeContainer: { flexDirection: 'row', gap: 8, marginTop: 5 },
-  metodeBadge: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, backgroundColor: '#f0f0f0' },
-  metodeActive: { backgroundColor: Colors.primary },
-  metodeText: { fontSize: 11, color: '#666' },
-  metodeTextActive: { color: '#fff', fontWeight: 'bold' },
-
-  listCard: { paddingHorizontal: 12, marginTop: 10 },
-  itemCard: { backgroundColor: "#fff", borderRadius: 12, padding: 15, marginBottom: 10, elevation: 1 },
-  itemTopRow: { flexDirection: "row", justifyContent: "space-between", marginBottom: 5 },
-  invoiceText: { fontSize: 14, fontWeight: "bold" },
-  methodBadge: { fontSize: 10, color: Colors.primary, backgroundColor: '#fff0f0', paddingHorizontal: 8, borderRadius: 5, overflow: 'hidden' },
-  itemText: { color: "#888", fontSize: 11 },
-  itemTotalText: { fontSize: 15, fontWeight: 'bold', color: '#333', marginTop: 5 },
-
-  modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
-  modalBox: { backgroundColor: "#fff", borderTopLeftRadius: 25, borderTopRightRadius: 25, padding: 20, maxHeight: "85%" },
-  modalHeader: { flexDirection: "row", justifyContent: "space-between", marginBottom: 15 },
-  modalTitle: { fontSize: 17, fontWeight: "bold" },
-  detailHeaderBox: { backgroundColor: "#f8f9fa", padding: 12, borderRadius: 10 },
-  detailText: { fontSize: 13, marginBottom: 3 },
-  detailItemRow: { flexDirection: 'row', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#f0f0f0' },
-  detailItemName: { fontSize: 13, fontWeight: '600' },
-  detailItemSub: { fontSize: 11, color: '#888' },
-  detailItemTotal: { fontSize: 13, fontWeight: 'bold' },
-  printBtn: { backgroundColor: Colors.primary, height: 50, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, marginTop: 20 },
-  printBtnText: { color: "#fff", fontWeight: "bold" }
+  container: {
+    flex: 1,
+    backgroundColor: "#F8FAFC",
+  },
+  topHeader: {
+    backgroundColor: "#fff",
+    paddingTop: 50,
+    paddingHorizontal: 20,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F1F5F9",
+  },
+  headerTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 20,
+  },
+  headerIconButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: "#F8FAFC",
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#F1F5F9",
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: "#1E293B",
+  },
+  searchSection: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 16,
+  },
+  searchBarWrapper: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F1F5F9",
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    height: 46,
+  },
+  searchIcon: {
+    marginRight: 8,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 14,
+    color: "#1E293B",
+    fontWeight: "500",
+  },
+  filterButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#fff",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    height: 46,
+    gap: 6,
+  },
+  filterButtonText: {
+    fontSize: 12,
+    color: "#475569",
+    fontWeight: "600",
+  },
+  metodeScroll: {
+    paddingBottom: 4,
+    gap: 8,
+  },
+  metodePill: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 12,
+    backgroundColor: "#F1F5F9",
+    borderWidth: 1,
+    borderColor: "#F1F5F9",
+  },
+  metodePillActive: {
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
+  },
+  metodePillText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#64748B",
+  },
+  metodePillTextActive: {
+    color: "#fff",
+  },
+  scrollContent: {
+    padding: 20,
+  },
+  summaryGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 12,
+    marginBottom: 24,
+  },
+  summaryBox: {
+    flex: 1,
+    minWidth: '45%',
+    backgroundColor: "#fff",
+    borderRadius: 20,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: "#F1F5F9",
+    shadowColor: "#0F172A",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.03,
+    shadowRadius: 10,
+    elevation: 2,
+  },
+  summaryLabel: {
+    fontSize: 10,
+    color: "#94A3B8",
+    fontWeight: "600",
+    textTransform: "uppercase",
+    marginBottom: 4,
+  },
+  summaryValue: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: "#1E293B",
+  },
+  listHeader: {
+    marginBottom: 16,
+  },
+  listHeaderText: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: "#1E293B",
+  },
+  listSubHeaderText: {
+    fontSize: 13,
+    color: Colors.textSoft,
+    marginTop: 2,
+  },
+  transactionCard: {
+    backgroundColor: "#fff",
+    borderRadius: 20,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: "#F1F5F9",
+    shadowColor: "#0F172A",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.03,
+    shadowRadius: 10,
+    elevation: 2,
+  },
+  cardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  iconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    backgroundColor: "#FEF2F2",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  cardMainInfo: {
+    flex: 1,
+  },
+  titleRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 2,
+  },
+  invoiceNo: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#1E293B",
+  },
+  methodBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  methodBadgeText: {
+    fontSize: 10,
+    fontWeight: "800",
+  },
+  cardSubText: {
+    fontSize: 12,
+    color: "#64748B",
+    fontWeight: "500",
+  },
+  divider: {
+    height: 1,
+    backgroundColor: "#F1F5F9",
+    marginVertical: 12,
+  },
+  amountRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  amountLabel: {
+    fontSize: 12,
+    color: "#94A3B8",
+    fontWeight: "600",
+  },
+  amountValue: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: Colors.primary,
+  },
+  loadingBox: {
+    paddingVertical: 40,
+    alignItems: "center",
+  },
+  loadingText: {
+    marginTop: 12,
+    color: "#64748B",
+    fontSize: 14,
+  },
+  emptyContainer: {
+    paddingVertical: 80,
+    alignItems: "center",
+    paddingHorizontal: 40,
+  },
+  emptyCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: "#F1F5F9",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 20,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#1E293B",
+    marginBottom: 8,
+  },
+  emptySub: {
+    fontSize: 14,
+    color: "#64748B",
+    textAlign: "center",
+    lineHeight: 20,
+  },
+  // Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(15, 23, 42, 0.4)",
+    justifyContent: "flex-end",
+  },
+  modalBox: {
+    width: "100%",
+    backgroundColor: "#fff",
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    padding: 24,
+    maxHeight: "90%",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: -10 },
+    shadowOpacity: 0.1,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 24,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: "800",
+    color: "#1E293B",
+  },
+  detailHeaderSection: {
+    backgroundColor: "#F8FAFC",
+    borderRadius: 20,
+    padding: 16,
+    gap: 12,
+    marginBottom: 20,
+  },
+  detailInfoItem: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  detailLabel: {
+    fontSize: 12,
+    color: "#64748B",
+    fontWeight: "600",
+  },
+  detailValue: {
+    fontSize: 13,
+    color: "#1E293B",
+    fontWeight: "700",
+  },
+  sectionTitle: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: "#475569",
+    marginBottom: 12,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  detailItemRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F1F5F9",
+  },
+  itemName: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#1E293B",
+  },
+  itemSub: {
+    fontSize: 12,
+    color: "#94A3B8",
+    marginTop: 2,
+  },
+  itemTotal: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: "#1E293B",
+  },
+  totalSection: {
+    marginTop: 20,
+    backgroundColor: "#F8FAFC",
+    padding: 16,
+    borderRadius: 20,
+    gap: 8,
+  },
+  totalRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  totalLabel: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: "#1E293B",
+  },
+  totalValue: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: Colors.primary,
+  },
+  paymentLabel: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#64748B",
+  },
+  paymentValue: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#1E293B",
+  },
+  submitButton: {
+    backgroundColor: Colors.primary,
+    height: 56,
+    borderRadius: 16,
+    flexDirection: 'row',
+    justifyContent: "center",
+    alignItems: "center",
+    marginTop: 32,
+    marginBottom: 20,
+    shadowColor: Colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  submitButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "800",
+  },
 });

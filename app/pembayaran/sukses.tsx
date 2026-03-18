@@ -7,9 +7,10 @@ import {
   ScrollView,
   Alert,
   ActivityIndicator,
+  SafeAreaView,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { buildStrukText } from "../../utils/strukFormatter";
 import { printStruk } from "../../services/printerService";
 import { getDetailPenjualan } from "../../services/penjualan";
@@ -19,6 +20,14 @@ import Colors from "../../constants/colors";
 function formatRupiah(value: number) {
   return `Rp ${Number(value || 0).toLocaleString("id-ID")}`;
 }
+
+const DottedLine = () => (
+  <View style={styles.dottedLineContainer}>
+    {[...Array(40)].map((_, i) => (
+      <View key={i} style={styles.dot} />
+    ))}
+  </View>
+);
 
 export default function PembayaranSuksesScreen() {
   const router = useRouter();
@@ -39,7 +48,6 @@ export default function PembayaranSuksesScreen() {
       setLoading(true);
       const res = await getDetailPenjualan(Number(id_penjualan), Number(id_mitra));
       if (res.success) {
-        // Flatten structure for the UI compatibility
         setData({
           ...res.data.header,
           items: res.data.items,
@@ -62,7 +70,7 @@ export default function PembayaranSuksesScreen() {
       }
 
       const text = buildStrukText(data);
-      const result = await printStruk(text);
+      const result = await printStruk(text, data?.logo || null);
 
       if (!result.success) {
         Alert.alert("Printer", result.message || "Gagal mencetak struk.");
@@ -83,7 +91,7 @@ export default function PembayaranSuksesScreen() {
     return (
       <View style={styles.center}>
         <ActivityIndicator size="large" color={Colors.primary} />
-        <Text style={{ marginTop: 10 }}>Memuat detail transaksi...</Text>
+        <Text style={styles.loadingText}>Memuat detail transaksi...</Text>
       </View>
     );
   }
@@ -91,164 +99,298 @@ export default function PembayaranSuksesScreen() {
   if (!data) {
     return (
       <View style={styles.center}>
-        <Ionicons name="alert-circle-outline" size={64} color="#ccc" />
-        <Text style={{ marginTop: 10 }}>Data transaksi tidak ditemukan.</Text>
+        <Ionicons name="alert-circle-outline" size={80} color={Colors.textSoft} />
+        <Text style={styles.errorText}>Data transaksi tidak ditemukan.</Text>
         <TouchableOpacity 
-          style={[styles.newBtn, { marginTop: 20, paddingHorizontal: 20 }]} 
+          style={styles.backButton} 
           onPress={() => router.back()}
         >
-          <Text style={styles.newBtnText}>Kembali</Text>
+          <Text style={styles.backButtonText}>Kembali</Text>
         </TouchableOpacity>
       </View>
     );
   }
 
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.successBox}>
-        <Ionicons name="checkmark-circle" size={72} color="#2F8F46" />
-        <Text style={styles.successTitle}>Transaksi Berhasil</Text>
-        <Text style={styles.successAmount}>{formatRupiah(data.total)}</Text>
-        <Text style={styles.successSub}>Pembayaran berhasil disimpan</Text>
-      </View>
-
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Detail Pembayaran</Text>
-        <Text style={styles.rowText}>No. Transaksi: #{data.id_penjualan}</Text>
-        <Text style={styles.rowText}>Tanggal: {data.tanggal}</Text>
-        <Text style={styles.rowText}>Kasir: {data.kasir}</Text>
-        <Text style={styles.rowText}>Metode: {data.metode_pembayaran}</Text>
-        <Text style={styles.rowText}>Total: {formatRupiah(data.total)}</Text>
-        <Text style={styles.rowText}>Bayar: {formatRupiah(data.bayar)}</Text>
-        <Text style={styles.rowText}>Kembalian: {formatRupiah(data.kembalian)}</Text>
-        <Text style={styles.rowText}>
-          Nama Pelanggan: {data.nama_pelanggan || "-"}
-        </Text>
-        <Text style={styles.rowText}>
-          Nomor HP: {data.nomor_hp || "-"}
-        </Text>
-      </View>
-
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Item Transaksi</Text>
-        {(data.items || []).map((item: any, index: number) => (
-          <View key={`${item.id_produk}-${index}`} style={styles.itemRow}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.itemName}>{item.nama_produk}</Text>
-              <Text style={styles.itemSub}>
-                {item.qty} x {formatRupiah(item.harga)}
-              </Text>
-            </View>
-            <Text style={styles.itemTotal}>{formatRupiah(item.total)}</Text>
+    <SafeAreaView style={styles.safeArea}>
+      <ScrollView 
+        style={styles.container}
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.header}>
+          <View style={styles.successIconContainer}>
+            <Ionicons name="checkmark" size={40} color="#fff" />
           </View>
-        ))}
-      </View>
+          <Text style={styles.successTitle}>Transaksi Berhasil!</Text>
+          <Text style={styles.successDate}>{data.tanggal}</Text>
+        </View>
 
-      <TouchableOpacity style={styles.printBtn} onPress={handlePrint}>
-        <Text style={styles.printBtnText}>Cetak Struk</Text>
-      </TouchableOpacity>
+        <View style={styles.receiptCard}>
+          <View style={styles.receiptHeader}>
+            <Text style={styles.receiptStoreName}>{data.nama_toko || "GoKasir"}</Text>
+            <Text style={styles.receiptId}>No. Transaksi: #{data.id_penjualan}</Text>
+          </View>
+          
+          <DottedLine />
 
-      <TouchableOpacity style={styles.newBtn} onPress={handleTransaksiBaru}>
-        <Text style={styles.newBtnText}>Transaksi Baru</Text>
-      </TouchableOpacity>
+          <View style={styles.itemsContainer}>
+            {(data.items || []).map((item: any, index: number) => (
+              <View key={`${item.id_produk}-${index}`} style={styles.itemRow}>
+                <View style={styles.itemMainInfo}>
+                  <Text style={styles.itemName}>{item.nama_produk}</Text>
+                  <Text style={styles.itemQty}>
+                    {item.qty} x {formatRupiah(item.harga)}
+                  </Text>
+                </View>
+                <Text style={styles.itemTotal}>{formatRupiah(item.total)}</Text>
+              </View>
+            ))}
+          </View>
 
-      <View style={{ height: 30 }} />
-    </ScrollView>
+          <DottedLine />
+
+          <View style={styles.pricingContainer}>
+            <View style={styles.priceRow}>
+              <Text style={styles.priceLabel}>Total</Text>
+              <Text style={styles.priceValue}>{formatRupiah(data.total)}</Text>
+            </View>
+            <View style={styles.priceRow}>
+              <Text style={styles.priceLabel}>Bayar ({data.metode_pembayaran})</Text>
+              <Text style={styles.priceValue}>{formatRupiah(data.bayar)}</Text>
+            </View>
+            <View style={[styles.priceRow, styles.totalRow]}>
+              <Text style={styles.totalLabel}>Kembalian</Text>
+              <Text style={styles.totalValue}>{formatRupiah(data.kembalian)}</Text>
+            </View>
+          </View>
+
+          <DottedLine />
+
+          <View style={styles.customerInfo}>
+             <View style={styles.infoLine}>
+               <Text style={styles.infoLabel}>Kasir:</Text>
+               <Text style={styles.infoValue}>{data.kasir}</Text>
+             </View>
+             {data.nama_pelanggan && (
+               <View style={styles.infoLine}>
+                 <Text style={styles.infoLabel}>Pelanggan:</Text>
+                 <Text style={styles.infoValue}>{data.nama_pelanggan}</Text>
+               </View>
+             )}
+          </View>
+        </View>
+
+        <View style={styles.actionContainer}>
+          <TouchableOpacity style={styles.printBtn} onPress={handlePrint}>
+            <Ionicons name="print-outline" size={20} color="#fff" />
+            <Text style={styles.printBtnText}>Cetak Struk</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.newBtn} onPress={handleTransaksiBaru}>
+            <Text style={styles.newBtnText}>Transaksi Baru</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.background },
-  center: { flex: 1, justifyContent: "center", alignItems: "center" },
+  safeArea: { flex: 1, backgroundColor: Colors.background },
+  container: { flex: 1 },
+  content: { padding: 20 },
+  center: { flex: 1, justifyContent: "center", alignItems: "center", padding: 40 },
+  
+  loadingText: { marginTop: 12, color: Colors.textSoft, fontSize: 14 },
+  errorText: { marginTop: 12, color: Colors.textSoft, fontSize: 16, textAlign: "center" },
+  backButton: { 
+    marginTop: 24, 
+    paddingHorizontal: 30, 
+    paddingVertical: 12, 
+    backgroundColor: Colors.primary, 
+    borderRadius: 12 
+  },
+  backButtonText: { color: "#fff", fontWeight: "700" },
 
-  successBox: {
-    backgroundColor: "#fff",
-    margin: 12,
-    borderRadius: 16,
-    padding: 20,
+  header: {
     alignItems: "center",
+    marginBottom: 24,
+  },
+  successIconContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: "#2F8F46",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 16,
+    shadowColor: "#2F8F46",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.2,
+    shadowRadius: 10,
+    elevation: 5,
   },
   successTitle: {
-    marginTop: 10,
-    fontSize: 20,
-    fontWeight: "700",
+    fontSize: 22,
+    fontWeight: "800",
     color: Colors.text,
   },
-  successAmount: {
-    marginTop: 8,
-    fontSize: 28,
-    fontWeight: "700",
-    color: Colors.primary,
-  },
-  successSub: {
-    marginTop: 6,
-    color: "#666",
+  successDate: {
+    fontSize: 13,
+    color: Colors.textSoft,
+    marginTop: 4,
   },
 
-  card: {
+  receiptCard: {
     backgroundColor: "#fff",
-    marginHorizontal: 12,
-    marginTop: 12,
-    borderRadius: 14,
-    padding: 16,
+    borderRadius: 20,
+    padding: 20,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 15,
+    elevation: 3,
   },
-  cardTitle: {
-    fontSize: 15,
-    fontWeight: "700",
+  receiptHeader: {
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  receiptStoreName: {
+    fontSize: 18,
+    fontWeight: "800",
     color: Colors.text,
+    marginBottom: 4,
+  },
+  receiptId: {
+    fontSize: 12,
+    color: Colors.textSoft,
+  },
+
+  dottedLineContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginVertical: 16,
+    height: 1,
+    overflow: "hidden",
+  },
+  dot: {
+    width: 3,
+    height: 1,
+    backgroundColor: "#E0E0E0",
+    marginHorizontal: 1,
+  },
+
+  itemsContainer: {
     marginBottom: 10,
   },
-  rowText: {
-    fontSize: 13,
-    color: Colors.text,
-    marginBottom: 6,
-  },
-
   itemRow: {
     flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: "#eee",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: 12,
+  },
+  itemMainInfo: {
+    flex: 1,
+    marginRight: 10,
   },
   itemName: {
-    fontSize: 13,
-    fontWeight: "700",
+    fontSize: 14,
+    fontWeight: "600",
     color: Colors.text,
   },
-  itemSub: {
+  itemQty: {
     fontSize: 12,
-    color: "#666",
+    color: Colors.textSoft,
     marginTop: 2,
   },
   itemTotal: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: "700",
     color: Colors.text,
   },
 
+  pricingContainer: {
+    marginTop: 4,
+  },
+  priceRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 8,
+  },
+  priceLabel: {
+    fontSize: 13,
+    color: Colors.textSoft,
+  },
+  priceValue: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: Colors.text,
+  },
+  totalRow: {
+    marginTop: 8,
+    paddingTop: 8,
+  },
+  totalLabel: {
+    fontSize: 15,
+    fontWeight: "800",
+    color: Colors.primary,
+  },
+  totalValue: {
+    fontSize: 18,
+    fontWeight: "900",
+    color: Colors.primary,
+  },
+
+  customerInfo: {
+    marginTop: 8,
+  },
+  infoLine: {
+    flexDirection: "row",
+    marginBottom: 4,
+  },
+  infoLabel: {
+    fontSize: 12,
+    color: Colors.textSoft,
+    width: 80,
+  },
+  infoValue: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: Colors.text,
+  },
+
+  actionContainer: {
+    marginTop: 24,
+    gap: 12,
+  },
   printBtn: {
     backgroundColor: Colors.primary,
-    margin: 12,
-    borderRadius: 14,
-    height: 52,
+    borderRadius: 16,
+    height: 56,
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
+    shadowColor: Colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
   },
   printBtnText: {
     color: "#fff",
     fontWeight: "700",
     fontSize: 16,
+    marginLeft: 8,
   },
-
   newBtn: {
     backgroundColor: "#fff",
-    marginHorizontal: 12,
-    borderRadius: 14,
-    height: 52,
+    borderRadius: 16,
+    height: 56,
     alignItems: "center",
     justifyContent: "center",
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: Colors.primary,
   },
   newBtnText: {

@@ -6,11 +6,13 @@ import {
   TextInput,
   TouchableOpacity,
   ScrollView,
-  SafeAreaView,
   StatusBar,
   Alert,
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "../../constants/colors";
@@ -61,8 +63,8 @@ export default function RegisterMitraScreen() {
       const result = await registerMitraRequest({
         nama_toko: namaToko,
         nama_pemilik: namaPemilik,
-        email: email, // Email dikirim sebagai identitas utama
-        username: email, // Backend tetap butuh username? Kita isi pakai email saja
+        email: email,
+        username: email,
         no_hp: noHp,
         alamat,
         password,
@@ -85,191 +87,291 @@ export default function RegisterMitraScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="light-content" backgroundColor={Colors.primary} />
-      
-      {/* Elegant Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Ionicons name="arrow-back" size={24} color="#fff" />
-        </TouchableOpacity>
-        <View style={styles.headerTextContainer}>
-          <Text style={styles.headerTitle}>Daftar Mitra Baru</Text>
-          <Text style={styles.headerSub}>Bergabunglah dengan ekosistem kami</Text>
-        </View>
-      </View>
-
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
+      <StatusBar barStyle="dark-content" backgroundColor={Colors.white} />
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={{ flex: 1 }}
       >
-        <View style={styles.formContainer}>
-          <Text style={styles.sectionTitle}>Informasi Bisnis</Text>
-          
-          <View style={styles.inputGroup}>
-            <Ionicons name="business-outline" size={20} color={Colors.primary} style={styles.inputIcon} />
-            <TextInput
-              style={styles.input}
-              placeholder="Nama Toko / Usaha"
-              value={namaToko}
-              onChangeText={setNamaToko}
-              editable={!loading}
-            />
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Ionicons name="person-outline" size={20} color={Colors.primary} style={styles.inputIcon} />
-            <TextInput
-              style={styles.input}
-              placeholder="Nama Pemilik"
-              value={namaPemilik}
-              onChangeText={setNamaPemilik}
-              editable={!loading}
-            />
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Ionicons name="mail-outline" size={20} color={Colors.primary} style={styles.inputIcon} />
-            <TextInput
-              style={styles.input}
-              placeholder="Email (Gunakan sebagai Username)"
-              value={email}
-              onChangeText={setEmail}
-              autoCapitalize="none"
-              keyboardType="email-address"
-              editable={!loading}
-            />
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Ionicons name="logo-whatsapp" size={20} color={Colors.primary} style={styles.inputIcon} />
-            <TextInput
-              style={styles.input}
-              placeholder="No. HP / WhatsApp"
-              value={noHp}
-              onChangeText={setNoHp}
-              keyboardType="phone-pad"
-              editable={!loading}
-            />
-          </View>
-
-          <View style={[styles.inputGroup, { alignItems: 'flex-start', paddingTop: 12 }]}>
-            <Ionicons name="location-outline" size={20} color={Colors.primary} style={styles.inputIcon} />
-            <TextInput
-              style={[styles.input, styles.textarea]}
-              placeholder="Alamat Lengkap Toko"
-              value={alamat}
-              onChangeText={setAlamat}
-              multiline
-              numberOfLines={3}
-              editable={!loading}
-            />
-          </View>
-
-          <View style={styles.divider} />
-          <Text style={styles.sectionTitle}>Keamanan Akun</Text>
-
-          <View style={styles.inputGroup}>
-            <Ionicons name="lock-closed-outline" size={20} color={Colors.primary} style={styles.inputIcon} />
-            <TextInput
-              style={styles.input}
-              placeholder="Password"
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-              editable={!loading}
-            />
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Ionicons name="shield-checkmark-outline" size={20} color={Colors.primary} style={styles.inputIcon} />
-            <TextInput
-              style={styles.input}
-              placeholder="Konfirmasi Password"
-              value={konfirmasiPassword}
-              onChangeText={setKonfirmasiPassword}
-              secureTextEntry
-              editable={!loading}
-            />
-          </View>
-
-          <TouchableOpacity
-            style={[styles.submitButton, loading && styles.disabledBtn]}
-            onPress={handleSubmit}
-            disabled={loading}
-          >
-            {loading ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.submitButtonText}>Buat Akun Mitra</Text>
-            )}
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+            <Ionicons name="chevron-back" size={28} color={Colors.text} />
           </TouchableOpacity>
-
-          <View style={styles.footerRow}>
-            <Text style={styles.footerText}>Sudah jadi mitra? </Text>
-            <TouchableOpacity onPress={() => router.replace("/login")}>
-              <Text style={styles.footerLink}>Login Sekarang</Text>
-            </TouchableOpacity>
+          <View style={styles.headerTextContainer}>
+            <Text style={styles.headerTitle}>Daftar Mitra</Text>
+            <Text style={styles.headerSub}>Mulai kelola bisnis Anda dengan mudah</Text>
           </View>
         </View>
-      </ScrollView>
+
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          <View style={styles.formContainer}>
+            <Text style={styles.sectionTitle}>Informasi Bisnis</Text>
+
+            <View style={styles.inputLabelContainer}>
+              <Text style={styles.inputLabel}>Nama Toko / Usaha</Text>
+            </View>
+            <View style={styles.inputWrapper}>
+              <Ionicons name="business-outline" size={20} color={Colors.textSoft} style={styles.inputIcon} />
+              <TextInput
+                style={styles.input}
+                placeholder="Masukkan nama toko"
+                placeholderTextColor={Colors.textSoft}
+                value={namaToko}
+                onChangeText={setNamaToko}
+                editable={!loading}
+              />
+            </View>
+
+            <View style={styles.inputLabelContainer}>
+              <Text style={styles.inputLabel}>Nama Pemilik</Text>
+            </View>
+            <View style={styles.inputWrapper}>
+              <Ionicons name="person-outline" size={20} color={Colors.textSoft} style={styles.inputIcon} />
+              <TextInput
+                style={styles.input}
+                placeholder="Masukkan nama lengkap"
+                placeholderTextColor={Colors.textSoft}
+                value={namaPemilik}
+                onChangeText={setNamaPemilik}
+                editable={!loading}
+              />
+            </View>
+
+            <View style={styles.inputLabelContainer}>
+              <Text style={styles.inputLabel}>Email / Username</Text>
+            </View>
+            <View style={styles.inputWrapper}>
+              <Ionicons name="mail-outline" size={20} color={Colors.textSoft} style={styles.inputIcon} />
+              <TextInput
+                style={styles.input}
+                placeholder="Masukkan email aktif"
+                placeholderTextColor={Colors.textSoft}
+                value={email}
+                onChangeText={setEmail}
+                autoCapitalize="none"
+                keyboardType="email-address"
+                editable={!loading}
+              />
+            </View>
+
+            <View style={styles.inputLabelContainer}>
+              <Text style={styles.inputLabel}>No. HP / WhatsApp</Text>
+            </View>
+            <View style={styles.inputWrapper}>
+              <Ionicons name="logo-whatsapp" size={20} color={Colors.textSoft} style={styles.inputIcon} />
+              <TextInput
+                style={styles.input}
+                placeholder="Masukkan nomor aktif"
+                placeholderTextColor={Colors.textSoft}
+                value={noHp}
+                onChangeText={setNoHp}
+                keyboardType="phone-pad"
+                editable={!loading}
+              />
+            </View>
+
+            <View style={styles.inputLabelContainer}>
+              <Text style={styles.inputLabel}>Alamat Lengkap</Text>
+            </View>
+            <View style={[styles.inputWrapper, styles.textareaWrapper]}>
+              <Ionicons name="location-outline" size={20} color={Colors.textSoft} style={styles.inputIcon} />
+              <TextInput
+                style={[styles.input, styles.textarea]}
+                placeholder="Masukkan alamat lengkap toko"
+                placeholderTextColor={Colors.textSoft}
+                value={alamat}
+                onChangeText={setAlamat}
+                multiline
+                numberOfLines={3}
+                editable={!loading}
+              />
+            </View>
+
+            <Text style={[styles.sectionTitle, { marginTop: 12 }]}>Keamanan</Text>
+
+            <View style={styles.inputLabelContainer}>
+              <Text style={styles.inputLabel}>Password</Text>
+            </View>
+            <View style={styles.inputWrapper}>
+              <Ionicons name="lock-closed-outline" size={20} color={Colors.textSoft} style={styles.inputIcon} />
+              <TextInput
+                style={styles.input}
+                placeholder="Buat password minimal 6 karakter"
+                placeholderTextColor={Colors.textSoft}
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry
+                editable={!loading}
+              />
+            </View>
+
+            <View style={styles.inputLabelContainer}>
+              <Text style={styles.inputLabel}>Konfirmasi Password</Text>
+            </View>
+            <View style={styles.inputWrapper}>
+              <Ionicons name="shield-checkmark-outline" size={20} color={Colors.textSoft} style={styles.inputIcon} />
+              <TextInput
+                style={styles.input}
+                placeholder="Ulangi password Anda"
+                placeholderTextColor={Colors.textSoft}
+                value={konfirmasiPassword}
+                onChangeText={setKonfirmasiPassword}
+                secureTextEntry
+                editable={!loading}
+              />
+            </View>
+
+            <TouchableOpacity
+              style={[styles.submitButton, loading && styles.disabledBtn]}
+              onPress={handleSubmit}
+              disabled={loading}
+            >
+              {loading ? (
+                <ActivityIndicator color={Colors.white} />
+              ) : (
+                <Text style={styles.submitButtonText}>Daftar Menjadi Mitra</Text>
+              )}
+            </TouchableOpacity>
+
+            <View style={styles.footerRow}>
+              <Text style={styles.footerText}>Sudah memiliki akun? </Text>
+              <TouchableOpacity onPress={() => router.replace("/login")}>
+                <Text style={styles.footerLink}>Login Sekarang</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: "#F8F9FA" },
+  safeArea: {
+    flex: 1,
+    backgroundColor: Colors.white,
+  },
   header: {
-    backgroundColor: Colors.primary,
-    paddingTop: 20,
-    paddingBottom: 30,
+    flexDirection: "row",
+    alignItems: "center",
     paddingHorizontal: 20,
-    borderBottomLeftRadius: 30,
-    borderBottomRightRadius: 30,
-    flexDirection: 'row',
-    alignItems: 'center',
+    paddingTop: 12,
+    paddingBottom: 20,
+    backgroundColor: Colors.white,
   },
-  backBtn: { padding: 8, marginLeft: -10 },
-  headerTextContainer: { marginLeft: 10 },
-  headerTitle: { color: "#fff", fontSize: 22, fontWeight: "bold" },
-  headerSub: { color: "rgba(255,255,255,0.8)", fontSize: 13, marginTop: 2 },
-  
-  scrollContent: { paddingBottom: 40 },
-  formContainer: { paddingHorizontal: 20, marginTop: -20 },
-  sectionTitle: { fontSize: 14, fontWeight: 'bold', color: '#666', marginBottom: 15, textTransform: 'uppercase', letterSpacing: 1 },
-  
-  inputGroup: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    marginBottom: 15,
-    paddingHorizontal: 15,
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOpacity: 0.05,
-    shadowRadius: 5,
-  },
-  inputIcon: { marginRight: 10 },
-  input: { flex: 1, height: 50, color: '#333', fontSize: 15 },
-  textarea: { height: 80, textAlignVertical: 'top', paddingTop: 0 },
-  
-  divider: { height: 1, backgroundColor: '#E0E0E0', marginVertical: 20 },
-  
-  submitButton: {
-    backgroundColor: Colors.primary,
-    height: 55,
-    borderRadius: 15,
+  backBtn: {
+    width: 40,
+    height: 40,
     alignItems: "center",
     justifyContent: "center",
-    marginTop: 10,
+    marginLeft: -10,
+  },
+  headerTextContainer: {
+    marginLeft: 8,
+  },
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: "800",
+    color: Colors.text,
+  },
+  headerSub: {
+    fontSize: 13,
+    color: Colors.textSoft,
+    marginTop: 2,
+  },
+  scrollContent: {
+    paddingHorizontal: 24,
+    paddingBottom: 40,
+  },
+  formContainer: {
+    width: "100%",
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: Colors.text,
+    marginBottom: 20,
+    marginTop: 8,
+  },
+  inputLabelContainer: {
+    marginLeft: 4,
+    marginBottom: 8,
+  },
+  inputLabel: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: Colors.text,
+  },
+  inputWrapper: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F9F9F9",
+    borderWidth: 1.5,
+    borderColor: "#F0F0F0",
+    borderRadius: 16,
+    height: 56,
+    marginBottom: 16,
+    paddingHorizontal: 16,
+  },
+  textareaWrapper: {
+    height: 100,
+    alignItems: "flex-start",
+    paddingVertical: 12,
+  },
+  inputIcon: {
+    marginRight: 12,
+    marginTop: Platform.OS === "android" ? 2 : 0,
+  },
+  input: {
+    flex: 1,
+    height: "100%",
+    fontSize: 15,
+    color: Colors.text,
+  },
+  textarea: {
+    textAlignVertical: "top",
+  },
+  submitButton: {
+    backgroundColor: Colors.primary,
+    height: 56,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 24,
+    shadowColor: Colors.primary,
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
     elevation: 4,
   },
-  disabledBtn: { opacity: 0.6 },
-  submitButtonText: { color: "#fff", fontSize: 16, fontWeight: "bold" },
-  
-  footerRow: { flexDirection: "row", justifyContent: "center", marginTop: 25 },
-  footerText: { color: "#666", fontSize: 14 },
-  footerLink: { color: Colors.primary, fontSize: 14, fontWeight: "bold" },
+  disabledBtn: {
+    backgroundColor: "#D1D1D1",
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  submitButtonText: {
+    color: Colors.white,
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  footerRow: {
+    flexDirection: "row",
+    justifyContent: "center",
+    marginTop: 24,
+  },
+  footerText: {
+    fontSize: 14,
+    color: Colors.textSoft,
+  },
+  footerLink: {
+    fontSize: 14,
+    color: Colors.primary,
+    fontWeight: "700",
+  },
 });

@@ -9,6 +9,7 @@ import {
   Alert,
   RefreshControl,
   Dimensions,
+  Pressable,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
@@ -20,6 +21,10 @@ import Colors from "../../constants/colors";
 import { getLaporanSummary } from "../../services/laporan";
 
 const screenWidth = Dimensions.get("window").width;
+
+function formatRupiah(value: number) {
+  return `Rp ${Number(value || 0).toLocaleString("id-ID")}`;
+}
 
 export default function LaporanScreen() {
   const router = useRouter();
@@ -36,8 +41,7 @@ export default function LaporanScreen() {
   useEffect(() => { initializePage(); }, []);
   useEffect(() => { if (userData?.id_mitra) fetchLaporan(userData.id_mitra, false); }, [dtAwal, dtAkhir]);
 
-  const formatRupiah = (v: number) => `Rp ${Number(v || 0).toLocaleString("id-ID")}`;
-  const formatTglIndo = (date: Date) => date.toLocaleDateString("id-ID", { day: '2-digit', month: 'long', year: 'numeric' });
+  const formatTglIndo = (date: Date) => date.toLocaleDateString("id-ID", { day: '2-digit', month: 'short', year: 'numeric' });
   const formatDateDb = (date: Date) => date.toISOString().split("T")[0];
 
   const initializePage = async () => {
@@ -45,8 +49,9 @@ export default function LaporanScreen() {
       setLoading(true);
       const stored = await AsyncStorage.getItem("user_data");
       if (!stored) return router.replace("/login");
-      setUserData(JSON.parse(stored));
-      await fetchLaporan(JSON.parse(stored).id_mitra, false);
+      const user = JSON.parse(stored);
+      setUserData(user);
+      await fetchLaporan(user.id_mitra, false);
     } catch (e) { Alert.alert("Error", "Gagal load session"); }
     finally { setLoading(false); }
   };
@@ -69,131 +74,145 @@ export default function LaporanScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backRow}>
-          <Ionicons name="arrow-back" size={22} color="#fff" />
-          <View style={{ marginLeft: 12 }}>
-            <Text style={styles.headerTitle}>Laporan Performa</Text>
-            <Text style={styles.headerSub}>Analisa data real-time toko</Text>
-          </View>
-        </TouchableOpacity>
-      </View>
+      <View style={styles.topHeader}>
+        <View style={styles.headerTopRow}>
+          <TouchableOpacity 
+            onPress={() => router.back()} 
+            style={styles.headerIconButton}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="arrow-back" size={24} color={Colors.text} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Laporan Performa</Text>
+          <View style={{ width: 40 }} />
+        </View>
 
-      {/* Filter Periode Keren */}
-      <View style={styles.periodeContainer}>
-        <View style={styles.periodeCard}>
-          <Ionicons name="calendar" size={20} color={Colors.primary} />
-          <View style={styles.periodeTextRow}>
-            <TouchableOpacity onPress={() => setShowPicker({ show: true, field: "awal" })}>
-              <Text style={styles.tglText}>{formatTglIndo(dtAwal)}</Text>
-            </TouchableOpacity>
-            <Text style={styles.smdText}> s/d </Text>
-            <TouchableOpacity onPress={() => setShowPicker({ show: true, field: "akhir" })}>
-              <Text style={styles.tglText}>{formatTglIndo(dtAkhir)}</Text>
-            </TouchableOpacity>
-          </View>
+        <View style={styles.periodeSection}>
+            <View style={styles.periodeRow}>
+                <Ionicons name="calendar-outline" size={18} color={Colors.primary} />
+                <TouchableOpacity onPress={() => setShowPicker({ show: true, field: "awal" })}>
+                    <Text style={styles.tglText}>{formatTglIndo(dtAwal)}</Text>
+                </TouchableOpacity>
+                <Text style={styles.smdText}>s/d</Text>
+                <TouchableOpacity onPress={() => setShowPicker({ show: true, field: "akhir" })}>
+                    <Text style={styles.tglText}>{formatTglIndo(dtAkhir)}</Text>
+                </TouchableOpacity>
+            </View>
         </View>
       </View>
 
       <ScrollView 
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => fetchLaporan(userData?.id_mitra, true)} />}
-        contentContainerStyle={{ paddingBottom: 40 }}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
       >
         {loading ? (
-          <ActivityIndicator size="large" color={Colors.primary} style={{ marginTop: 50 }} />
+          <View style={styles.loadingBox}>
+            <ActivityIndicator size="large" color={Colors.primary} />
+            <Text style={styles.loadingText}>Menganalisa data...</Text>
+          </View>
         ) : laporan && (
           <View>
             {/* 1. Omzet & Transaksi */}
             <View style={styles.summaryGrid}>
-              <View style={[styles.summaryBox, { borderLeftColor: '#2196F3', borderLeftWidth: 4 }]}>
-                <Text style={styles.summaryLabel}>OMZET</Text>
-                <Text style={styles.summaryValue}>{formatRupiah(laporan.summary_penjualan?.omzet)}</Text>
+              <View style={styles.summaryBox}>
+                <Text style={styles.summaryLabel}>Total Omzet</Text>
+                <Text style={[styles.summaryValue, { color: Colors.primary }]}>{formatRupiah(laporan.summary_penjualan?.omzet)}</Text>
               </View>
-              <View style={[styles.summaryBox, { borderLeftColor: '#FF9800', borderLeftWidth: 4 }]}>
-                <Text style={styles.summaryLabel}>TRANSAKSI</Text>
+              <View style={styles.summaryBox}>
+                <Text style={styles.summaryLabel}>Total Transaksi</Text>
                 <Text style={styles.summaryValue}>{laporan.summary_penjualan?.total_transaksi} Nota</Text>
               </View>
             </View>
 
             {/* 2. Grafik Penjualan */}
-            <View style={styles.card}>
-              <Text style={styles.cardTitle}>Tren Penjualan</Text>
-              <LineChart
-                data={{ labels, datasets: [{ data: values }] }}
-                width={screenWidth - 45}
-                height={180}
-                chartConfig={{
-                  backgroundGradientFrom: "#fff",
-                  backgroundGradientTo: "#fff",
-                  color: (opacity = 1) => `rgba(10, 126, 164, ${opacity})`,
-                  labelColor: () => "#999",
-                  decimalPlaces: 0,
-                  propsForDots: { r: "4", strokeWidth: "2", stroke: Colors.primary }
-                }}
-                bezier
-                style={{ borderRadius: 10, marginLeft: -15 }}
-              />
+            <View style={styles.reportCard}>
+              <Text style={styles.cardTitle}>Tren Omzet Harian</Text>
+              <View style={styles.chartContainer}>
+                <LineChart
+                  data={{ labels, datasets: [{ data: values }] }}
+                  width={screenWidth - 72}
+                  height={200}
+                  chartConfig={{
+                    backgroundGradientFrom: "#fff",
+                    backgroundGradientTo: "#fff",
+                    color: (opacity = 1) => `rgba(225, 37, 37, ${opacity})`,
+                    labelColor: () => "#94A3B8",
+                    decimalPlaces: 0,
+                    propsForDots: { r: "5", strokeWidth: "2", stroke: Colors.primary },
+                    propsForBackgroundLines: { strokeDasharray: "" },
+                  }}
+                  bezier
+                  style={styles.chartStyle}
+                />
+              </View>
             </View>
 
-            {/* 3. Piutang Pelanggan (hutang_xx) */}
-            <View style={[styles.card, { borderTopWidth: 3, borderTopColor: Colors.primary }]}>
-              <Text style={styles.cardTitle}>Piutang Pelanggan</Text>
-              <View style={styles.hRow}>
-                <View style={styles.hCol}>
-                  <Text style={styles.hLabel}>Belum Lunas</Text>
+            {/* 3. Piutang Pelanggan */}
+            <View style={[styles.reportCard, { borderLeftWidth: 4, borderLeftColor: Colors.primary }]}>
+              <Text style={styles.cardTitle}>Riwayat Piutang</Text>
+              <View style={styles.hGrid}>
+                <View style={styles.hItem}>
+                  <Text style={styles.hLabel}>Pending</Text>
                   <Text style={[styles.hValue, { color: Colors.primary }]}>{formatRupiah(laporan.summary_hutang?.total_belum_lunas)}</Text>
                 </View>
-                <View style={styles.hCol}>
-                  <Text style={styles.hLabel}>Sudah Lunas</Text>
-                  <Text style={[styles.hValue, { color: '#2e7d32' }]}>{formatRupiah(laporan.summary_hutang?.total_lunas)}</Text>
+                <View style={styles.hItem}>
+                  <Text style={styles.hLabel}>Terselesaikan</Text>
+                  <Text style={[styles.hValue, { color: '#16A34A' }]}>{formatRupiah(laporan.summary_hutang?.total_lunas)}</Text>
                 </View>
               </View>
             </View>
 
-            {/* 4. Logistik & Pengeluaran */}
-            <View style={styles.card}>
-              <Text style={styles.cardTitle}>Aktivitas Biaya & Stok</Text>
-              <View style={styles.logistikRow}>
-                <View style={[styles.iconBox, { backgroundColor: '#e3f2fd' }]}>
-                  <Ionicons name="download-outline" size={20} color="#1976d2" />
-                </View>
-                <View style={{ flex: 1, marginLeft: 12 }}>
-                  <Text style={styles.logistikLabel}>Stok Masuk</Text>
-                  <Text style={styles.logistikSub}>{laporan.summary_produk_masuk?.total_transaksi_produk_masuk || 0} Trx</Text>
-                </View>
-                <Text style={styles.logistikValue}>+{laporan.summary_produk_masuk?.total_qty_masuk || 0} Pcs</Text>
-              </View>
-              <View style={styles.divider} />
-              <View style={styles.logistikRow}>
-                <View style={[styles.iconBox, { backgroundColor: '#fff3e0' }]}>
-                  <Ionicons name="trending-down-outline" size={20} color="#f57c00" />
-                </View>
-                <View style={{ flex: 1, marginLeft: 12 }}>
-                  <Text style={styles.logistikLabel}>Pengeluaran</Text>
-                  <Text style={styles.logistikSub}>{laporan.summary_pengeluaran?.total_transaksi_pengeluaran || 0} Trx</Text>
-                </View>
-                <Text style={[styles.logistikValue, { color: '#d32f2f' }]}>-{formatRupiah(laporan.summary_pengeluaran?.total_pengeluaran)}</Text>
-              </View>
-            </View>
-
-            {/* 5. Top 10 Produk Terlaris */}
-            <View style={styles.card}>
-              <Text style={styles.cardTitle}>10 Produk Terlaris</Text>
-              {laporan.produk_terlaris?.map((item: any, index: number) => (
-                <View key={index} style={styles.produkRow}>
-                  <View style={styles.produkRank}><Text style={styles.rankText}>{index + 1}</Text></View>
-                  <View style={{ flex: 1, marginLeft: 10 }}>
-                    <Text style={styles.produkNama}>{item.nama_produk}</Text>
-                    <View style={styles.barContainer}>
-                      <View style={[styles.barFill, { width: `${Math.min((item.total_qty / (laporan.produk_terlaris[0].total_qty || 1)) * 100, 100)}%` }]} />
+            {/* 4. Logistik Row Cards */}
+            <View style={styles.reportCard}>
+                <Text style={styles.cardTitle}>Aset & Biaya</Text>
+                <View style={styles.logRow}>
+                    <View style={styles.logIconBox}>
+                        <Ionicons name="cube-outline" size={20} color="#1E40AF" />
                     </View>
-                  </View>
-                  <Text style={styles.produkQty}>{item.total_qty} <Text style={{fontSize: 9}}>Qty</Text></Text>
+                    <View style={{ flex: 1 }}>
+                        <Text style={styles.logLabel}>Restock Produk</Text>
+                        <Text style={styles.logSub}>{laporan.summary_produk_masuk?.total_transaksi_produk_masuk || 0} Trx</Text>
+                    </View>
+                    <Text style={styles.logValue}>+{laporan.summary_produk_masuk?.total_qty_masuk || 0} Pcs</Text>
                 </View>
-              ))}
+                <View style={styles.divider} />
+                <View style={styles.logRow}>
+                    <View style={[styles.logIconBox, { backgroundColor: '#FEF2F2' }]}>
+                        <Ionicons name="wallet-outline" size={20} color={Colors.primary} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                        <Text style={styles.logLabel}>Biaya Operasional</Text>
+                        <Text style={styles.logSub}>{laporan.summary_pengeluaran?.total_transaksi_pengeluaran || 0} Trx</Text>
+                    </View>
+                    <Text style={[styles.logValue, { color: Colors.primary }]}>-{formatRupiah(laporan.summary_pengeluaran?.total_pengeluaran)}</Text>
+                </View>
+            </View>
+
+            {/* 5. Top 10 Produk */}
+            <View style={styles.reportCard}>
+              <View style={styles.bestSellerHeader}>
+                <Text style={styles.cardTitle}>10 Produk Terlaris</Text>
+                <Ionicons name="trophy-outline" size={18} color="#D1A000" />
+              </View>
+              <View style={{ marginTop: 16 }}>
+                {laporan.produk_terlaris?.map((item: any, index: number) => (
+                  <View key={index} style={styles.bestSellerRow}>
+                    <View style={styles.rankBadge}><Text style={styles.rankText}>{index + 1}</Text></View>
+                    <View style={{ flex: 1, marginHorizontal: 12 }}>
+                      <Text style={styles.bestSellerName}>{item.nama_produk}</Text>
+                      <View style={styles.progressBar}>
+                        <View style={[styles.progressFill, { width: `${Math.min((item.total_qty / (laporan.produk_terlaris[0].total_qty || 1)) * 100, 100)}%` }]} />
+                      </View>
+                    </View>
+                    <Text style={styles.bestSellerQty}>{item.total_qty} <Text style={{fontSize: 10, color: '#94A3B8'}}>Qty</Text></Text>
+                  </View>
+                ))}
+              </View>
             </View>
           </View>
         )}
+        <View style={{ height: 100 }} />
       </ScrollView>
 
       {showPicker.show && (
@@ -211,43 +230,226 @@ export default function LaporanScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#f4f7fa" },
-  header: { backgroundColor: Colors.primary, paddingTop: 50, paddingHorizontal: 20, paddingBottom: 25 },
-  backRow: { flexDirection: "row", alignItems: "center" },
-  headerTitle: { color: "#fff", fontSize: 19, fontWeight: "bold" },
-  headerSub: { color: "rgba(255,255,255,0.7)", fontSize: 11 },
-
-  periodeContainer: { marginTop: -15, paddingHorizontal: 15 },
-  periodeCard: { backgroundColor: "#fff", borderRadius: 12, padding: 15, flexDirection: 'row', alignItems: 'center', elevation: 4 },
-  periodeTextRow: { flexDirection: 'row', marginLeft: 10, alignItems: 'center' },
-  tglText: { fontWeight: 'bold', color: Colors.primary, fontSize: 13, borderBottomWidth: 1, borderBottomColor: Colors.primary },
-  smdText: { color: '#999', marginHorizontal: 5 },
-
-  summaryGrid: { flexDirection: 'row', paddingHorizontal: 10, marginTop: 15 },
-  summaryBox: { flex: 1, backgroundColor: '#fff', margin: 5, padding: 15, borderRadius: 15, elevation: 2 },
-  summaryLabel: { fontSize: 10, color: '#888', fontWeight: 'bold' },
-  summaryValue: { fontSize: 16, fontWeight: 'bold', marginTop: 4, color: '#333' },
-
-  card: { backgroundColor: "#fff", marginHorizontal: 15, marginTop: 15, borderRadius: 15, padding: 15, elevation: 2 },
-  cardTitle: { fontSize: 14, fontWeight: 'bold', color: '#444', marginBottom: 15 },
-
-  hRow: { flexDirection: 'row' },
-  hCol: { flex: 1 },
-  hLabel: { fontSize: 10, color: '#999', textTransform: 'uppercase' },
-  hValue: { fontSize: 14, fontWeight: 'bold', marginTop: 3 },
-
-  logistikRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 5 },
-  iconBox: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  logistikLabel: { fontSize: 13, fontWeight: '600', color: '#333' },
-  logistikSub: { fontSize: 10, color: '#999' },
-  logistikValue: { fontSize: 13, fontWeight: 'bold', color: '#1976d2' },
-  divider: { height: 1, backgroundColor: '#f0f0f0', marginVertical: 10 },
-
-  produkRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
-  produkRank: { width: 22, height: 22, borderRadius: 11, backgroundColor: '#f0f0f0', alignItems: 'center', justifyContent: 'center' },
-  rankText: { fontSize: 11, fontWeight: 'bold', color: '#777' },
-  produkNama: { fontSize: 13, color: '#333' },
-  barContainer: { height: 5, backgroundColor: '#f0f0f0', borderRadius: 3, marginTop: 4, overflow: 'hidden' },
-  barFill: { height: '100%', backgroundColor: Colors.primary },
-  produkQty: { marginLeft: 10, fontWeight: 'bold', color: Colors.primary, fontSize: 13 }
+  container: {
+    flex: 1,
+    backgroundColor: "#F8FAFC",
+  },
+  topHeader: {
+    backgroundColor: "#fff",
+    paddingTop: 50,
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F1F5F9",
+  },
+  headerTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 20,
+  },
+  headerIconButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: "#F8FAFC",
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#F1F5F9",
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: "#1E293B",
+  },
+  periodeSection: {
+    backgroundColor: "#F8FAFC",
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    height: 50,
+    justifyContent: "center",
+  },
+  periodeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  tglText: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: Colors.primary,
+  },
+  smdText: {
+    fontSize: 12,
+    color: "#94A3B8",
+    fontWeight: "600",
+  },
+  scrollContent: {
+    padding: 20,
+  },
+  summaryGrid: {
+    flexDirection: "row",
+    gap: 12,
+    marginBottom: 20,
+  },
+  summaryBox: {
+    flex: 1,
+    backgroundColor: "#fff",
+    borderRadius: 20,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: "#F1F5F9",
+    shadowColor: "#0F172A",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.03,
+    shadowRadius: 10,
+    elevation: 2,
+  },
+  summaryLabel: {
+    fontSize: 11,
+    color: "#94A3B8",
+    fontWeight: "600",
+    textTransform: "uppercase",
+    marginBottom: 4,
+  },
+  summaryValue: {
+    fontSize: 15,
+    fontWeight: "800",
+    color: "#1E293B",
+  },
+  reportCard: {
+    backgroundColor: "#fff",
+    borderRadius: 24,
+    padding: 20,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: "#F1F5F9",
+    shadowColor: "#0F172A",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.03,
+    shadowRadius: 10,
+    elevation: 2,
+  },
+  cardTitle: {
+    fontSize: 15,
+    fontWeight: "800",
+    color: "#1E293B",
+    marginBottom: 16,
+  },
+  chartContainer: {
+    alignItems: "center",
+    marginTop: 8,
+    marginLeft: -20,
+  },
+  chartStyle: {
+    borderRadius: 16,
+  },
+  hGrid: {
+    flexDirection: "row",
+    gap: 16,
+  },
+  hItem: {
+    flex: 1,
+  },
+  hLabel: {
+    fontSize: 10,
+    color: "#94A3B8",
+    fontWeight: "600",
+    textTransform: "uppercase",
+    marginBottom: 4,
+  },
+  hValue: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: "#1E293B",
+  },
+  logRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingVertical: 4,
+  },
+  logIconBox: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: "#EFF6FF",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  logLabel: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#334155",
+  },
+  logSub: {
+    fontSize: 12,
+    color: "#94A3B8",
+    fontWeight: "500",
+  },
+  logValue: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: "#1E40AF",
+  },
+  divider: {
+    height: 1,
+    backgroundColor: "#F1F5F9",
+    marginVertical: 12,
+  },
+  bestSellerHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  bestSellerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  rankBadge: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    backgroundColor: "#F1F5F9",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  rankText: {
+    fontSize: 13,
+    fontWeight: "800",
+    color: "#64748B",
+  },
+  bestSellerName: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#1E293B",
+    marginBottom: 6,
+  },
+  progressBar: {
+    height: 6,
+    backgroundColor: "#F1F5F9",
+    borderRadius: 3,
+    overflow: "hidden",
+  },
+  progressFill: {
+    height: "100%",
+    backgroundColor: Colors.primary,
+  },
+  bestSellerQty: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: Colors.primary,
+  },
+  loadingBox: {
+    paddingVertical: 80,
+    alignItems: "center",
+  },
+  loadingText: {
+    marginTop: 12,
+    color: "#64748B",
+    fontSize: 14,
+    fontWeight: "600",
+  },
 });

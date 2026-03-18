@@ -144,11 +144,11 @@ export default function ProdukScreen() {
       const result = await getProdukKategoriList(mitraId);
 
       if (result.success) {
-        const apiKategori = (result.data || [])
+        const apiKategori: string[] = (result.data || [])
           .map((item: any) => String(item.kategori || "").trim())
           .filter((item: string) => item !== "");
 
-        const uniqueKategori = Array.from(new Set(apiKategori));
+        const uniqueKategori = [...new Set(apiKategori)];
         setKategoriList(["Semua Kategori", ...uniqueKategori]);
       } else {
         setKategoriList(["Semua Kategori"]);
@@ -459,9 +459,87 @@ export default function ProdukScreen() {
 
   return (
     <View style={styles.container}>
+      <View style={styles.topHeader}>
+        <View style={styles.headerTopRow}>
+          <TouchableOpacity 
+            onPress={() => router.back()} 
+            style={styles.headerIconButton}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="arrow-back" size={24} color={Colors.text} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Daftar Produk</Text>
+          <TouchableOpacity 
+            style={styles.headerAddButton} 
+            onPress={handleOpenTambah}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="add" size={20} color="#fff" />
+            <Text style={styles.headerAddButtonText}>Baru</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.searchSection}>
+          <View style={styles.searchBarWrapper}>
+            <Ionicons name="search" size={20} color={Colors.textSoft} style={styles.searchIcon} />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Cari produk..."
+              placeholderTextColor={Colors.textSoft}
+              value={keyword}
+              onChangeText={setKeyword}
+            />
+          </View>
+          
+          <TouchableOpacity
+            style={styles.filterButton}
+            onPress={() => setShowKategoriDropdown((prev) => !prev)}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="funnel-outline" size={18} color={Colors.primary} />
+            <Text style={styles.filterButtonText} numberOfLines={1}>
+              {selectedKategori === "Semua Kategori" ? "Kategori" : selectedKategori}
+            </Text>
+            <Ionicons name="chevron-down" size={14} color={Colors.textSoft} />
+          </TouchableOpacity>
+        </View>
+
+        {showKategoriDropdown && (
+          <View style={styles.dropdownOverlay}>
+            <Pressable style={StyleSheet.absoluteFill} onPress={() => setShowKategoriDropdown(false)} />
+            <View style={styles.dropdownContents}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryScroll}>
+                {kategoriList.map((item) => (
+                  <TouchableOpacity
+                    key={item}
+                    style={[
+                      styles.categoryPill,
+                      selectedKategori === item && styles.categoryPillActive,
+                    ]}
+                    onPress={() => {
+                      setSelectedKategori(item);
+                      setShowKategoriDropdown(false);
+                    }}
+                  >
+                    <Text
+                      style={[
+                        styles.categoryPillText,
+                        selectedKategori === item && styles.categoryPillTextActive,
+                      ]}
+                    >
+                      {item}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          </View>
+        )}
+      </View>
+
       <ScrollView
         showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={styles.scrollContent}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -471,222 +549,146 @@ export default function ProdukScreen() {
           />
         }
       >
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backRow}>
-            <Ionicons name="arrow-back" size={22} color="#fff" />
-            <Text style={styles.headerTitle}>Manajemen Produk</Text>
-          </TouchableOpacity>
+        <View style={styles.listHeader}>
+          <Text style={styles.listHeaderText}>
+            Total {products.length} Produk
+          </Text>
+          <Text style={styles.listSubHeaderText}>
+            {userData?.nama_toko || "Semua Mitra"}
+          </Text>
+        </View>
 
-          <View style={styles.headerBottomRow}>
-            <Text style={styles.headerSub}>
-              Kelola produk per mitra - {userData?.role || "Admin"}
-            </Text>
-
-            <TouchableOpacity style={styles.addButton} onPress={handleOpenTambah}>
-              <Text style={styles.addButtonText}>+ Produk</Text>
-            </TouchableOpacity>
+        {loading || (listLoading && products.length === 0) ? (
+          <View style={styles.loadingBox}>
+            <ActivityIndicator size="large" color={Colors.primary} />
+            <Text style={styles.loadingText}>Menyiapkan data...</Text>
           </View>
-        </View>
-
-        <View style={styles.filterRow}>
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Cari nama produk..."
-            placeholderTextColor={Colors.textSoft}
-            value={keyword}
-            onChangeText={setKeyword}
-          />
-
-          <View style={styles.dropdownWrapper}>
-            <TouchableOpacity
-              style={styles.dropdownButton}
-              onPress={() => setShowKategoriDropdown((prev) => !prev)}
-            >
-              <Text
-                style={styles.dropdownButtonText}
-                numberOfLines={1}
-                ellipsizeMode="tail"
-              >
-                {selectedKategori}
-              </Text>
-              <Ionicons name="chevron-down" size={18} color={Colors.text} />
-            </TouchableOpacity>
-
-            {showKategoriDropdown && (
-              <View style={styles.dropdownList}>
-                {kategoriList.map((item) => (
-                  <TouchableOpacity
-                    key={item}
-                    style={[
-                      styles.dropdownItem,
-                      selectedKategori === item && styles.dropdownItemActive,
-                    ]}
-                    onPress={() => {
-                      setSelectedKategori(item);
-                      setShowKategoriDropdown(false);
-                    }}
-                  >
-                    <Text
-                      style={[
-                        styles.dropdownItemText,
-                        selectedKategori === item &&
-                          styles.dropdownItemTextActive,
-                      ]}
-                    >
-                      {item}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            )}
-          </View>
-        </View>
-
-        <View style={styles.tableHeader}>
-          <Text style={[styles.tableHeaderText, { flex: 1.2 }]}>Gambar</Text>
-          <Text style={[styles.tableHeaderText, { flex: 2 }]}>Produk</Text>
-          <Text style={[styles.tableHeaderText, { flex: 1.3 }]}>Kategori</Text>
-          <Text style={[styles.tableHeaderText, { flex: 1.2 }]}>Harga</Text>
-          <Text style={[styles.tableHeaderText, { flex: 0.8 }]}>Stok</Text>
-        </View>
-
-        <View style={styles.listContainer}>
-          {loading || (listLoading && products.length === 0) ? (
-            <View style={styles.loadingBox}>
-              <ActivityIndicator size="large" color={Colors.primary} />
-              <Text style={styles.loadingText}>Memuat produk...</Text>
-            </View>
-          ) : products.length > 0 ? (
-            products.map((item) => (
-              <View key={item.id_produk} style={styles.productCard}>
-                <View style={styles.productRowTop}>
-                  <View style={[styles.productCell, { flex: 1.2 }]}>
-                    {item.gambar ? (
-                      <Image
-                        source={{ uri: item.gambar }}
-                        style={styles.productImage}
-                      />
-                    ) : (
-                      <View style={styles.noImageBox}>
-                        <Ionicons
-                          name="image-outline"
-                          size={18}
-                          color="#aaa"
-                        />
-                      </View>
-                    )}
-                  </View>
-
-                  <View
-                    style={[
-                      styles.productCell,
-                      { flex: 2, alignItems: "flex-start" },
-                    ]}
-                  >
-                    <Text style={styles.productName}>{item.nama_produk}</Text>
-                    <Text style={styles.productDiscount}>
-                      Diskon {item.diskon}%
-                    </Text>
-                    <Text
-                      style={[
-                        styles.productStatus,
-                        item.status_aktif === "aktif"
-                          ? styles.productStatusActive
-                          : styles.productStatusInactive,
-                      ]}
-                    >
-                      {item.status_aktif === "aktif" ? "Aktif" : "Nonaktif"}
-                    </Text>
-                  </View>
-
-                  <View style={[styles.productCell, { flex: 1.3 }]}>
-                    <Text style={styles.productSmall}>{item.kategori}</Text>
-                  </View>
-
-                  <View style={[styles.productCell, { flex: 1.2 }]}>
-                    <Text style={styles.productSmall}>
-                      {formatRupiah(item.harga)}
-                    </Text>
-                  </View>
-
-                  <View style={[styles.productCell, { flex: 0.8 }]}>
-                    <Text style={styles.productSmall}>{item.stok}</Text>
-                  </View>
+        ) : products.length > 0 ? (
+          products.map((item) => (
+            <View key={item.id_produk} style={styles.productCard}>
+              <View style={styles.cardHeader}>
+                <View style={styles.imageContainer}>
+                  {item.gambar ? (
+                    <Image source={{ uri: item.gambar }} style={styles.productImage} />
+                  ) : (
+                    <View style={styles.noImageBox}>
+                      <Ionicons name="cube-outline" size={24} color="#CBD5E1" />
+                    </View>
+                  )}
                 </View>
+                
+                <View style={styles.cardMainInfo}>
+                  <View style={styles.titleRow}>
+                    <Text style={styles.productName} numberOfLines={1}>{item.nama_produk}</Text>
+                    <View style={[
+                      styles.statusBadge,
+                      item.status_aktif === "aktif" ? styles.statusActive : styles.statusInactive
+                    ]}>
+                      <View style={[
+                        styles.statusDot, 
+                        { backgroundColor: item.status_aktif === "aktif" ? "#22C55E" : "#94A3B8" }
+                      ]} />
+                      <Text style={[
+                        styles.statusText,
+                        { color: item.status_aktif === "aktif" ? "#166534" : "#475569" }
+                      ]}>
+                        {item.status_aktif === "aktif" ? "Aktif" : "Nonaktif"}
+                      </Text>
+                    </View>
+                  </View>
+                  <Text style={styles.productKategori}>{item.kategori}</Text>
+                </View>
+              </View>
 
-                <View style={styles.actionRow}>
-                  <TouchableOpacity
-                    style={styles.editBtn}
+              <View style={styles.divider} />
+
+              <View style={styles.detailsGrid}>
+                <View style={styles.detailItem}>
+                  <Text style={styles.detailLabel}>Harga</Text>
+                  <Text style={styles.detailValue}>{formatRupiah(item.harga)}</Text>
+                </View>
+                <View style={styles.detailItem}>
+                  <Text style={styles.detailLabel}>Stok</Text>
+                  <Text style={styles.detailValue}>{item.stok} <Text style={styles.detailUnit}>{item.satuan}</Text></Text>
+                </View>
+                {item.diskon > 0 && (
+                  <View style={styles.detailItem}>
+                    <Text style={styles.detailLabel}>Diskon</Text>
+                    <View style={styles.discountBadge}>
+                      <Text style={styles.discountText}>{item.diskon}% OFF</Text>
+                    </View>
+                  </View>
+                )}
+              </View>
+
+              <View style={styles.cardActions}>
+                <TouchableOpacity 
+                  style={[styles.actionBtn, styles.btnOutline]} 
+                  onPress={() => handleToggleStatus(item.id_produk, item.status_aktif)}
+                >
+                  <Ionicons 
+                    name={item.status_aktif === "aktif" ? "eye-off-outline" : "eye-outline"} 
+                    size={18} 
+                    color={Colors.primary} 
+                  />
+                  <Text style={styles.btnOutlineText}>
+                    {item.status_aktif === "aktif" ? "Matikan" : "Aktifkan"}
+                  </Text>
+                </TouchableOpacity>
+
+                <View style={styles.actionRight}>
+                  <TouchableOpacity 
+                    style={styles.iconActionBtn} 
                     onPress={() => handleOpenEdit(item)}
                   >
-                    <Text style={styles.editBtnText}>Edit</Text>
+                    <Ionicons name="create-outline" size={20} color="#0EA5E9" />
                   </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={
-                      item.status_aktif === "aktif"
-                        ? styles.activeBtn
-                        : styles.inactiveBtn
-                    }
-                    onPress={() =>
-                      handleToggleStatus(item.id_produk, item.status_aktif)
-                    }
-                  >
-                    <Text
-                      style={
-                        item.status_aktif === "aktif"
-                          ? styles.activeBtnText
-                          : styles.inactiveBtnText
-                      }
-                    >
-                      {item.status_aktif === "aktif"
-                        ? "Aktif"
-                        : "Nonaktifkan"}
-                    </Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={styles.deleteBtn}
+                  
+                  <TouchableOpacity 
+                    style={styles.iconActionBtn} 
                     onPress={() => handleDelete(item.id_produk)}
                   >
-                    <Text style={styles.deleteBtnText}>Hapus</Text>
+                    <Ionicons name="trash-outline" size={20} color="#EF4444" />
                   </TouchableOpacity>
                 </View>
               </View>
-            ))
-          ) : (
-            <View style={styles.emptyBox}>
-              <Ionicons name="cube-outline" size={38} color="#B0B0B0" />
-              <Text style={styles.emptyText}>Produk tidak ditemukan.</Text>
             </View>
-          )}
-        </View>
-
-        <View style={{ height: 30 }} />
+          ))
+        ) : (
+          <View style={styles.emptyContainer}>
+            <View style={styles.emptyCircle}>
+              <Ionicons name="search" size={48} color="#E2E8F0" />
+            </View>
+            <Text style={styles.emptyTitle}>Produk Tidak Ditemukan</Text>
+            <Text style={styles.emptySub}>Coba cari dengan kata kunci lain atau tambah produk baru.</Text>
+          </View>
+        )}
+        <View style={{ height: 100 }} />
       </ScrollView>
 
-      <Modal visible={showModal} transparent animationType="fade">
+      <Modal visible={showModal} transparent animationType="slide">
         <Pressable style={styles.modalOverlay} onPress={closeModal}>
           <Pressable style={styles.modalBox} onPress={() => {}}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>
-                {editMode ? "Edit Produk" : "Tambah Produk"}
+                {editMode ? "Edit Produk" : "Tambah Produk Baru"}
               </Text>
-              <TouchableOpacity onPress={closeModal}>
-                <Ionicons name="close" size={22} color={Colors.text} />
+              <TouchableOpacity onPress={closeModal} style={styles.headerIconButton}>
+                <Ionicons name="close" size={24} color={Colors.text} />
               </TouchableOpacity>
             </View>
 
             <ScrollView
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
+              contentContainerStyle={{ paddingBottom: 40 }}
             >
               <Text style={styles.formLabel}>Nama Produk</Text>
               <TextInput
                 style={styles.formInput}
                 value={namaProduk}
                 onChangeText={setNamaProduk}
-                placeholder="Masukkan nama produk"
+                placeholder="Misal: Kopi Susu Aren"
                 placeholderTextColor={Colors.textSoft}
               />
 
@@ -707,7 +709,7 @@ export default function ProdukScreen() {
                   >
                     {kategori || "Pilih kategori"}
                   </Text>
-                  <Ionicons name="chevron-down" size={18} color={Colors.text} />
+                  <Ionicons name="chevron-down" size={18} color={Colors.textSoft} />
                 </TouchableOpacity>
 
                 {showModalKategoriDropdown && (
@@ -730,43 +732,55 @@ export default function ProdukScreen() {
                 )}
               </View>
 
-              <Text style={styles.formLabel}>Harga</Text>
-              <TextInput
-                style={styles.formInput}
-                keyboardType="numeric"
-                value={harga}
-                onChangeText={setHarga}
-                placeholder="Masukkan harga"
-                placeholderTextColor={Colors.textSoft}
-              />
+              <View style={{ flexDirection: "row", gap: 16 }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.formLabel}>Harga</Text>
+                  <TextInput
+                    style={styles.formInput}
+                    keyboardType="numeric"
+                    value={harga}
+                    onChangeText={setHarga}
+                    placeholder="0"
+                    placeholderTextColor={Colors.textSoft}
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.formLabel}>Diskon (%)</Text>
+                  <TextInput
+                    style={styles.formInput}
+                    keyboardType="numeric"
+                    value={diskon}
+                    onChangeText={setDiskon}
+                    placeholder="0"
+                    placeholderTextColor={Colors.textSoft}
+                  />
+                </View>
+              </View>
 
-              <Text style={styles.formLabel}>Diskon (%)</Text>
-              <TextInput
-                style={styles.formInput}
-                keyboardType="numeric"
-                value={diskon}
-                onChangeText={setDiskon}
-                placeholder="0"
-                placeholderTextColor={Colors.textSoft}
-              />
+              <View style={{ flexDirection: "row", gap: 16 }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.formLabel}>Stok</Text>
+                  <TextInput
+                    style={styles.formInput}
+                    keyboardType="numeric"
+                    value={stok}
+                    onChangeText={setStok}
+                    placeholder="0"
+                    placeholderTextColor={Colors.textSoft}
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.formLabel}>Satuan</Text>
+                  <TextInput
+                    style={styles.formInput}
+                    value={satuan}
+                    onChangeText={setSatuan}
+                    placeholder="Misal: Pcs"
+                    placeholderTextColor={Colors.textSoft}
+                  />
+                </View>
+              </View>
 
-              <Text style={styles.formLabel}>Stok</Text>
-              <TextInput
-                style={styles.formInput}
-                keyboardType="numeric"
-                value={stok}
-                onChangeText={setStok}
-                placeholder="0"
-                placeholderTextColor={Colors.textSoft}
-              />
-              <Text style={styles.formLabel}>Satuan</Text>
-              <TextInput
-                style={styles.formInput}
-                value={satuan}
-                onChangeText={setSatuan}
-                placeholder="Masukkan satuan"
-                placeholderTextColor={Colors.textSoft}
-              />
               <Text style={styles.formLabel}>Status</Text>
               <View style={{ position: "relative", zIndex: 20 }}>
                 <TouchableOpacity
@@ -777,9 +791,9 @@ export default function ProdukScreen() {
                   }}
                 >
                   <Text style={styles.formDropdownText}>
-                    {statusAktif === "aktif" ? "Aktif" : "Nonaktif"}
+                    {statusAktif === "aktif" ? "Aktif (Tampil)" : "Nonaktif (Sembunyi)"}
                   </Text>
-                  <Ionicons name="chevron-down" size={18} color={Colors.text} />
+                  <Ionicons name="chevron-down" size={18} color={Colors.textSoft} />
                 </TouchableOpacity>
 
                 {showModalStatusDropdown && (
@@ -807,9 +821,10 @@ export default function ProdukScreen() {
                 style={styles.fakeUploadBox}
                 onPress={handlePickImage}
               >
-                <Text style={styles.fakeUploadText}>Choose File</Text>
+                <Ionicons name="cloud-upload-outline" size={24} color={Colors.primary} />
+                <Text style={styles.fakeUploadText}>Pilih Foto Produk</Text>
                 <Text style={styles.fakeUploadSub}>
-                  {gambarPreview ? "1 file selected" : "No file chosen"}
+                  {gambarFile ? "Gambar dipilih" : "Saran: Rasio 1:1, Maks 2MB"}
                 </Text>
               </TouchableOpacity>
 
@@ -832,7 +847,7 @@ export default function ProdukScreen() {
                   <ActivityIndicator color="#fff" />
                 ) : (
                   <Text style={styles.submitButtonText}>
-                    {editMode ? "Update Produk" : "Simpan Produk"}
+                    {editMode ? "Simpan Perubahan" : "Tambahkan Produk"}
                   </Text>
                 )}
               </TouchableOpacity>
@@ -847,391 +862,480 @@ export default function ProdukScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: "#F8FAFC",
   },
-
-  header: {
-    backgroundColor: Colors.primary,
-    paddingTop: 44,
-    paddingHorizontal: 14,
-    paddingBottom: 18,
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
+  topHeader: {
+    backgroundColor: "#fff",
+    paddingTop: 60,
+    paddingBottom: 20,
+    paddingHorizontal: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F1F5F9",
+    zIndex: 100,
   },
-  backRow: {
+  headerTopRow: {
     flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 20,
+  },
+  headerIconButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: "#F1F5F9",
+    justifyContent: "center",
     alignItems: "center",
   },
   headerTitle: {
-    color: "#fff",
-    fontSize: 18,
-    fontWeight: "700",
-    marginLeft: 8,
+    fontSize: 20,
+    fontWeight: "800",
+    color: "#1E293B",
+    letterSpacing: -0.5,
   },
-  headerBottomRow: {
-    marginTop: 10,
+  headerAddButton: {
+    backgroundColor: Colors.primary,
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    gap: 4,
   },
-  headerSub: {
+  headerAddButtonText: {
     color: "#fff",
-    fontSize: 12,
-  },
-  addButton: {
-    backgroundColor: "#fff",
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 20,
-  },
-  addButtonText: {
-    color: Colors.primary,
     fontSize: 13,
     fontWeight: "700",
   },
-
-  filterRow: {
+  searchSection: {
     flexDirection: "row",
+    gap: 12,
+  },
+  searchBarWrapper: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F1F5F9",
+    borderRadius: 12,
     paddingHorizontal: 12,
-    marginTop: 14,
-    gap: 10,
-    zIndex: 100,
+    height: 44,
+  },
+  searchIcon: {
+    marginRight: 8,
   },
   searchInput: {
     flex: 1,
-    backgroundColor: "#fff",
-    borderWidth: 1,
-    borderColor: "#ddd",
-    borderRadius: 14,
-    height: 42,
-    paddingHorizontal: 14,
-    color: Colors.text,
+    fontSize: 14,
+    color: "#1E293B",
+    fontWeight: "500",
   },
-  dropdownWrapper: {
-    width: 160,
-    position: "relative",
-  },
-  dropdownButton: {
-    backgroundColor: "#fff",
-    borderWidth: 1,
-    borderColor: "#ddd",
-    borderRadius: 14,
-    height: 42,
-    paddingHorizontal: 14,
+  filterButton: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
+    backgroundColor: "#fff",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    height: 44,
+    gap: 6,
+    maxWidth: 140,
   },
-  dropdownButtonText: {
-    color: Colors.text,
+  filterButtonText: {
     fontSize: 13,
+    fontWeight: "600",
+    color: "#475569",
     flex: 1,
-    marginRight: 8,
   },
-  dropdownList: {
+  dropdownOverlay: {
     position: "absolute",
-    top: 45,
+    top: 170,
     left: 0,
     right: 0,
     backgroundColor: "#fff",
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: "#ddd",
-    overflow: "hidden",
-    zIndex: 999,
-  },
-  dropdownItem: {
-    paddingHorizontal: 12,
     paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F1F5F9",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 3,
   },
-  dropdownItemActive: {
-    backgroundColor: "#1E6BD6",
+  dropdownContents: {
+    paddingHorizontal: 20,
   },
-  dropdownItemText: {
-    color: Colors.text,
+  categoryScroll: {
+    gap: 8,
+    paddingBottom: 4,
+  },
+  categoryPill: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: "#F1F5F9",
+    borderWidth: 1,
+    borderColor: "transparent",
+  },
+  categoryPillActive: {
+    backgroundColor: "#FEF2F2",
+    borderColor: Colors.primary,
+  },
+  categoryPillText: {
     fontSize: 13,
+    fontWeight: "600",
+    color: "#64748B",
   },
-  dropdownItemTextActive: {
-    color: "#fff",
+  categoryPillTextActive: {
+    color: Colors.primary,
   },
-
-  tableHeader: {
-    marginTop: 14,
-    backgroundColor: Colors.primary,
-    marginHorizontal: 12,
-    borderTopLeftRadius: 8,
-    borderTopRightRadius: 8,
+  scrollContent: {
+    paddingHorizontal: 20,
+    paddingTop: 20,
+  },
+  listHeader: {
     flexDirection: "row",
-    paddingVertical: 10,
-    paddingHorizontal: 8,
+    justifyContent: "space-between",
+    alignItems: "flex-end",
+    marginBottom: 16,
   },
-  tableHeaderText: {
-    color: "#fff",
-    fontSize: 12,
+  listHeaderText: {
+    fontSize: 14,
     fontWeight: "700",
-    textAlign: "center",
+    color: "#1E293B",
   },
-
-  listContainer: {
-    marginHorizontal: 12,
-    backgroundColor: "#fff",
-    borderBottomLeftRadius: 8,
-    borderBottomRightRadius: 8,
-    overflow: "hidden",
+  listSubHeaderText: {
+    fontSize: 12,
+    color: "#94A3B8",
+    fontWeight: "500",
   },
   loadingBox: {
-    paddingVertical: 36,
+    paddingVertical: 60,
     alignItems: "center",
-    justifyContent: "center",
   },
   loadingText: {
-    marginTop: 10,
-    color: "#666",
+    marginTop: 12,
+    fontSize: 14,
+    color: "#64748B",
+    fontWeight: "500",
   },
   productCard: {
-    borderBottomWidth: 1,
-    borderBottomColor: "#eee",
-    paddingHorizontal: 8,
-    paddingVertical: 12,
+    backgroundColor: "#fff",
+    borderRadius: 20,
+    padding: 16,
+    marginBottom: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.03,
+    shadowRadius: 8,
+    elevation: 2,
+    borderWidth: 1,
+    borderColor: "#F1F5F9",
   },
-  productRowTop: {
+  cardHeader: {
     flexDirection: "row",
     alignItems: "center",
+    gap: 12,
   },
-  productCell: {
-    justifyContent: "center",
-    alignItems: "center",
-    paddingHorizontal: 4,
+  imageContainer: {
+    width: 64,
+    height: 64,
+    borderRadius: 14,
+    overflow: "hidden",
+    backgroundColor: "#F8FAFC",
   },
   productImage: {
-    width: 42,
-    height: 42,
-    borderRadius: 10,
+    width: "100%",
+    height: "100%",
   },
   noImageBox: {
-    width: 42,
-    height: 42,
-    borderRadius: 10,
-    backgroundColor: "#F1F1F1",
+    flex: 1,
     justifyContent: "center",
     alignItems: "center",
+  },
+  cardMainInfo: {
+    flex: 1,
+  },
+  titleRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 4,
   },
   productName: {
-    fontSize: 13,
+    fontSize: 16,
     fontWeight: "700",
-    color: Colors.text,
+    color: "#1E293B",
+    flex: 1,
+    marginRight: 8,
   },
-  productDiscount: {
-    fontSize: 11,
-    color: "#666",
-    marginTop: 2,
+  productKategori: {
+    fontSize: 13,
+    color: "#64748B",
+    fontWeight: "500",
   },
-  productStatus: {
-    fontSize: 10,
-    marginTop: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 10,
-    overflow: "hidden",
-  },
-  productStatusActive: {
-    backgroundColor: "#E8F5EA",
-    color: "#2F8F46",
-  },
-  productStatusInactive: {
-    backgroundColor: "#E8F0FF",
-    color: "#2563EB",
-  },
-  productSmall: {
-    fontSize: 12,
-    color: Colors.text,
-    textAlign: "center",
-  },
-
-  actionRow: {
-    marginTop: 10,
+  statusBadge: {
     flexDirection: "row",
-    justifyContent: "flex-end",
-    gap: 8,
-    flexWrap: "wrap",
+    alignItems: "center",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    gap: 4,
   },
-  editBtn: {
-    backgroundColor: "#F7E2A9",
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 14,
+  statusActive: {
+    backgroundColor: "#DCFCE7",
   },
-  editBtnText: {
-    color: "#9B6B00",
-    fontSize: 12,
+  statusInactive: {
+    backgroundColor: "#F1F5F9",
+  },
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  statusText: {
+    fontSize: 11,
+    fontWeight: "700",
+    textTransform: "capitalize",
+  },
+  divider: {
+    height: 1,
+    backgroundColor: "#F1F5F9",
+    marginVertical: 12,
+  },
+  detailsGrid: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 16,
+  },
+  detailItem: {
+    flex: 1,
+  },
+  detailLabel: {
+    fontSize: 11,
+    color: "#94A3B8",
     fontWeight: "600",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    marginBottom: 4,
   },
-  activeBtn: {
-    backgroundColor: "#E5F6E7",
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 14,
+  detailValue: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#334155",
   },
-  activeBtnText: {
-    color: "#2F8F46",
+  detailUnit: {
     fontSize: 12,
-    fontWeight: "600",
+    color: "#94A3B8",
+    fontWeight: "500",
   },
-  inactiveBtn: {
-    backgroundColor: "#E8F0FF",
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 14,
+  discountBadge: {
+    backgroundColor: "#FEF2F2",
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4,
+    alignSelf: "flex-start",
   },
-  inactiveBtnText: {
-    color: "#2563EB",
-    fontSize: 12,
-    fontWeight: "600",
+  discountText: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: Colors.primary,
   },
-  deleteBtn: {
-    backgroundColor: "#FCE8E8",
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 14,
-  },
-  deleteBtnText: {
-    color: "#E12525",
-    fontSize: 12,
-    fontWeight: "600",
-  },
-
-  emptyBox: {
-    paddingVertical: 36,
+  cardActions: {
+    flexDirection: "row",
+    justifyContent: "space-between",
     alignItems: "center",
   },
-  emptyText: {
-    color: "#777",
-    marginTop: 8,
+  actionBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 10,
   },
-
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.25)",
+  btnOutline: {
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    backgroundColor: "#fff",
+  },
+  btnOutlineText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#475569",
+  },
+  actionRight: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  iconActionBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: "#F8FAFC",
+    borderWidth: 1,
+    borderColor: "#F1F5F9",
     justifyContent: "center",
     alignItems: "center",
-    paddingHorizontal: 12,
+  },
+  emptyContainer: {
+    paddingVertical: 80,
+    alignItems: "center",
+    paddingHorizontal: 40,
+  },
+  emptyCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: "#F1F5F9",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 20,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#1E293B",
+    marginBottom: 8,
+  },
+  emptySub: {
+    fontSize: 14,
+    color: "#64748B",
+    textAlign: "center",
+    lineHeight: 20,
+  },
+
+  // Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(15, 23, 42, 0.4)",
+    justifyContent: "flex-end",
   },
   modalBox: {
     width: "100%",
-    maxHeight: "86%",
     backgroundColor: "#fff",
-    borderRadius: 22,
-    padding: 16,
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    padding: 24,
+    maxHeight: "90%",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: -10 },
+    shadowOpacity: 0.1,
+    shadowRadius: 20,
+    elevation: 10,
   },
   modalHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 14,
+    marginBottom: 24,
   },
   modalTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: Colors.text,
+    fontSize: 20,
+    fontWeight: "800",
+    color: "#1E293B",
   },
-
   formLabel: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: Colors.text,
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#475569",
     marginBottom: 8,
-    marginTop: 10,
+    marginTop: 16,
   },
   formInput: {
+    backgroundColor: "#F8FAFC",
     borderWidth: 1,
-    borderColor: "#D8D8D8",
+    borderColor: "#E2E8F0",
     borderRadius: 14,
-    height: 46,
-    paddingHorizontal: 14,
-    color: Colors.text,
-    backgroundColor: "#fff",
+    height: 50,
+    paddingHorizontal: 16,
+    fontSize: 14,
+    color: "#1E293B",
+    fontWeight: "500",
   },
   formDropdown: {
+    backgroundColor: "#F8FAFC",
     borderWidth: 1,
-    borderColor: "#D8D8D8",
+    borderColor: "#E2E8F0",
     borderRadius: 14,
-    height: 46,
-    paddingHorizontal: 14,
+    height: 50,
+    paddingHorizontal: 16,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    backgroundColor: "#fff",
   },
   formDropdownText: {
-    color: Colors.text,
     fontSize: 14,
+    color: "#1E293B",
+    fontWeight: "500",
   },
   formDropdownList: {
-    position: "absolute",
-    top: 48,
-    left: 0,
-    right: 0,
+    marginTop: 8,
     backgroundColor: "#fff",
-    borderRadius: 12,
+    borderRadius: 14,
     borderWidth: 1,
-    borderColor: "#ddd",
+    borderColor: "#E2E8F0",
     overflow: "hidden",
-    zIndex: 999,
+    elevation: 4,
   },
   formDropdownItem: {
-    paddingHorizontal: 14,
-    paddingVertical: 12,
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F1F5F9",
   },
   formDropdownItemText: {
-    color: Colors.text,
     fontSize: 14,
+    color: "#475569",
+    fontWeight: "500",
   },
-
   fakeUploadBox: {
+    backgroundColor: "#F8FAFC",
     borderWidth: 1,
-    borderColor: "#D8D8D8",
+    borderStyle: "dashed",
+    borderColor: "#CBD5E1",
     borderRadius: 14,
-    minHeight: 46,
-    paddingHorizontal: 12,
-    flexDirection: "row",
+    padding: 20,
     alignItems: "center",
+    justifyContent: "center",
     gap: 8,
   },
   fakeUploadText: {
-    fontSize: 12,
-    color: Colors.text,
-    backgroundColor: "#F3F3F3",
-    borderWidth: 1,
-    borderColor: "#ccc",
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
+    fontSize: 14,
+    fontWeight: "700",
+    color: Colors.primary,
   },
   fakeUploadSub: {
     fontSize: 12,
-    color: "#666",
+    color: "#94A3B8",
   },
   previewImage: {
-    width: 100,
-    height: 100,
-    borderRadius: 12,
-    marginTop: 10,
-  },
-
-  submitButton: {
-    marginTop: 18,
-    backgroundColor: Colors.primary,
-    height: 50,
+    width: 120,
+    height: 120,
     borderRadius: 16,
-    alignItems: "center",
+    marginTop: 16,
+    alignSelf: "center",
+  },
+  submitButton: {
+    backgroundColor: Colors.primary,
+    height: 56,
+    borderRadius: 16,
     justifyContent: "center",
+    alignItems: "center",
+    marginTop: 32,
+    marginBottom: 20,
+    shadowColor: Colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
   },
   submitButtonDisabled: {
-    opacity: 0.7,
+    backgroundColor: "#CBD5E1",
+    shadowOpacity: 0,
   },
   submitButtonText: {
     color: "#fff",
     fontSize: 16,
-    fontWeight: "700",
+    fontWeight: "800",
   },
 });
