@@ -29,7 +29,8 @@ export default function PrinterSettingsScreen() {
   const router = useRouter();
   const [devices, setDevices] = useState<BluetoothDevice[]>([]);
   const [loading, setLoading] = useState(false);
-  const [connectedDevice, setConnectedDevice] = useState<BluetoothDevice | null>(null);
+  const [connectedDevice, setConnectedDevice] =
+    useState<BluetoothDevice | null>(null);
 
   useEffect(() => {
     checkConnection();
@@ -43,21 +44,27 @@ export default function PrinterSettingsScreen() {
             (rsp: any) => {
               try {
                 const raw = rsp?.devices ?? rsp?.device ?? rsp;
-                const arr: any[] = typeof raw === "string" ? JSON.parse(raw) : raw;
+                const arr: any[] =
+                  typeof raw === "string" ? JSON.parse(raw) : raw;
                 if (Array.isArray(arr) && arr.length > 0) {
                   const cleaned = arr
-                    .map((d: any) => (typeof d === "string" ? JSON.parse(d) : d))
+                    .map((d: any) =>
+                      typeof d === "string" ? JSON.parse(d) : d,
+                    )
                     .filter((d: any) => d && d.address);
                   setDevices((prev) => {
                     const combined = [...prev, ...cleaned];
                     return combined.filter(
-                      (v, i, a) => a.findIndex((t) => t.address === v.address) === i
+                      (v, i, a) =>
+                        a.findIndex((t) => t.address === v.address) === i,
                     );
                   });
                 }
-              } catch (e) { console.log("EVENT_DEVICE_ALREADY_PAIRED parse error:", e); }
-            }
-          )
+              } catch (e) {
+                console.log("EVENT_DEVICE_ALREADY_PAIRED parse error:", e);
+              }
+            },
+          ),
         );
       }
 
@@ -68,16 +75,20 @@ export default function PrinterSettingsScreen() {
             (rsp: any) => {
               try {
                 const raw = rsp?.device ?? rsp?.devices ?? rsp;
-                const device: any = typeof raw === "string" ? JSON.parse(raw) : raw;
+                const device: any =
+                  typeof raw === "string" ? JSON.parse(raw) : raw;
                 if (device && device.address) {
                   setDevices((prev) => {
-                    if (prev.find((d) => d.address === device.address)) return prev;
+                    if (prev.find((d) => d.address === device.address))
+                      return prev;
                     return [...prev, device];
                   });
                 }
-              } catch (e) { console.log("EVENT_DEVICE_FOUND parse error:", e); }
-            }
-          )
+              } catch (e) {
+                console.log("EVENT_DEVICE_FOUND parse error:", e);
+              }
+            },
+          ),
         );
       }
     }
@@ -93,7 +104,9 @@ export default function PrinterSettingsScreen() {
       if (savedPrinter) {
         setConnectedDevice(JSON.parse(savedPrinter));
       }
-    } catch (error) { console.log("checkConnection error:", error); }
+    } catch (error) {
+      console.log("checkConnection error:", error);
+    }
   };
 
   const requestPermissions = async (): Promise<boolean> => {
@@ -120,8 +133,11 @@ export default function PrinterSettingsScreen() {
             "Anda telah menolak izin Bluetooth secara permanen. Silakan aktifkan di Pengaturan Aplikasi.",
             [
               { text: "Batal", style: "cancel" },
-              { text: "Buka Pengaturan", onPress: () => Linking.openSettings() },
-            ]
+              {
+                text: "Buka Pengaturan",
+                onPress: () => Linking.openSettings(),
+              },
+            ],
           );
           return false;
         }
@@ -165,38 +181,70 @@ export default function PrinterSettingsScreen() {
       if (!isEnabled) {
         if (Platform.OS === "android") {
           await BluetoothManager.enableBluetooth();
+          // Give system some time to actually turn on the radio
+          await new Promise((resolve) => setTimeout(resolve, 2000));
         } else {
-          Alert.alert("Bluetooth Tidak Aktif", "Silakan aktifkan Bluetooth terlebih dahulu.");
+          Alert.alert(
+            "Bluetooth Tidak Aktif",
+            "Silakan aktifkan Bluetooth terlebih dahulu.",
+          );
           setLoading(false);
           return;
         }
       }
 
-      const resultStr = await BluetoothManager.scanDevices();
+      // Sometimes scanDevices throws NOT_STARTED if called too quickly or if another scan is pending
+      const resultStr = await BluetoothManager.scanDevices().catch((e: any) => {
+        if (e?.message?.includes("NOT_STARTED")) {
+          // If NOT_STARTED, it often means it timed out or was interrupted.
+          // We can try to just return empty or throw a cleaner error.
+          return JSON.stringify({ paired: [], found: [] });
+        }
+        throw e;
+      });
+
       if (resultStr) {
-        const result = typeof resultStr === "string" ? JSON.parse(resultStr) : resultStr;
+        const result =
+          typeof resultStr === "string" ? JSON.parse(resultStr) : resultStr;
         const paired: any[] = Array.isArray(result.paired) ? result.paired : [];
         const found: any[] = Array.isArray(result.found) ? result.found : [];
 
         const parseDevice = (d: any): BluetoothDevice | null => {
-            try {
-              const obj = typeof d === "string" ? JSON.parse(d) : d;
-              if (obj && obj.address) return obj;
-              return null;
-            } catch { return null; }
+          try {
+            const obj = typeof d === "string" ? JSON.parse(d) : d;
+            if (obj && obj.address) return obj;
+            return null;
+          } catch {
+            return null;
+          }
         };
 
-        const all = [...paired.map(parseDevice), ...found.map(parseDevice)].filter(Boolean) as BluetoothDevice[];
+        const all = [
+          ...paired.map(parseDevice),
+          ...found.map(parseDevice),
+        ].filter(Boolean) as BluetoothDevice[];
         if (all.length > 0) {
           setDevices((prev) => {
             const combined = [...prev, ...all];
-            return combined.filter((v, i, a) => a.findIndex((t) => t.address === v.address) === i);
+            return combined.filter(
+              (v, i, a) => a.findIndex((t) => t.address === v.address) === i,
+            );
           });
         }
       }
     } catch (error: any) {
-        console.error("Scan Error:", error);
-    } finally { setLoading(false); }
+      console.error("Scan Error Detail:", error);
+      if (error?.message?.includes("NOT_STARTED")) {
+        Alert.alert(
+          "Scan Timeout",
+          "Pencarian perangkat berhenti. Pastikan Bluetooth aktif dan coba scan ulang.",
+        );
+      } else {
+        Alert.alert("Scan Gagal", "Terjadi kesalahan saat mencari perangkat.");
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   const connectToPrinter = async (device: BluetoothDevice) => {
@@ -208,14 +256,18 @@ export default function PrinterSettingsScreen() {
       Alert.alert("Sukses", `Terhubung ke ${device.name || "Printer"}`);
     } catch (error: any) {
       Alert.alert("Gagal Terhubung", "Pastikan printer menyala.");
-    } finally { setLoading(false); }
+    } finally {
+      setLoading(false);
+    }
   };
 
   const disconnectPrinter = async () => {
     try {
       if (connectedDevice) {
-        if (BluetoothManager.unpaire) await BluetoothManager.unpaire(connectedDevice.address);
-        else if (BluetoothManager.unpair) await BluetoothManager.unpair(connectedDevice.address);
+        if (BluetoothManager.unpaire)
+          await BluetoothManager.unpaire(connectedDevice.address);
+        else if (BluetoothManager.unpair)
+          await BluetoothManager.unpair(connectedDevice.address);
       }
       setConnectedDevice(null);
       await AsyncStorage.removeItem("selected_printer");
@@ -235,21 +287,34 @@ export default function PrinterSettingsScreen() {
         activeOpacity={0.7}
       >
         <View style={styles.deviceInfo}>
-            <View style={[styles.iconBox, isConnected && { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
-                <Ionicons
-                    name="print-outline"
-                    size={24}
-                    color={isConnected ? "#fff" : Colors.primary}
-                />
-            </View>
-            <View style={{ flex: 1 }}>
-                <Text style={[styles.deviceName, isConnected && { color: "#fff" }]} numberOfLines={1}>
-                    {item.name || "Unknown Device"}
-                </Text>
-                <Text style={[styles.deviceMac, isConnected && { color: "rgba(255,255,255,0.7)" }]}>
-                    {item.address}
-                </Text>
-            </View>
+          <View
+            style={[
+              styles.iconBox,
+              isConnected && { backgroundColor: "rgba(255,255,255,0.2)" },
+            ]}
+          >
+            <Ionicons
+              name="print-outline"
+              size={24}
+              color={isConnected ? "#fff" : Colors.primary}
+            />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text
+              style={[styles.deviceName, isConnected && { color: "#fff" }]}
+              numberOfLines={1}
+            >
+              {item.name || "Unknown Device"}
+            </Text>
+            <Text
+              style={[
+                styles.deviceMac,
+                isConnected && { color: "rgba(255,255,255,0.7)" },
+              ]}
+            >
+              {item.address}
+            </Text>
+          </View>
         </View>
         {isConnected ? (
           <Ionicons name="checkmark-circle" size={24} color="#fff" />
@@ -264,8 +329,8 @@ export default function PrinterSettingsScreen() {
     <View style={styles.container}>
       <View style={styles.topHeader}>
         <View style={styles.headerTopRow}>
-          <TouchableOpacity 
-            onPress={() => router.back()} 
+          <TouchableOpacity
+            onPress={() => router.back()}
             style={styles.headerIconButton}
             activeOpacity={0.7}
           >
@@ -276,20 +341,37 @@ export default function PrinterSettingsScreen() {
         </View>
 
         {/* Status Connection Card */}
-        <View style={[styles.statusBanner, connectedDevice ? styles.statusConnected : styles.statusDisconnected]}>
+        <View
+          style={[
+            styles.statusBanner,
+            connectedDevice
+              ? styles.statusConnected
+              : styles.statusDisconnected,
+          ]}
+        >
           <View style={styles.statusInfo}>
-             <Ionicons 
-                name={connectedDevice ? "checkmark-circle" : "alert-circle"} 
-                size={20} 
-                color={connectedDevice ? "#16A34A" : "#EF4444"} 
-             />
-             <Text style={[styles.statusText, { color: connectedDevice ? "#16A34A" : "#EF4444" }]}>
-                {connectedDevice ? `Terhubung: ${connectedDevice.name}` : "Printer Belum Terhubung"}
-             </Text>
+            <Ionicons
+              name={connectedDevice ? "checkmark-circle" : "alert-circle"}
+              size={20}
+              color={connectedDevice ? "#16A34A" : "#EF4444"}
+            />
+            <Text
+              style={[
+                styles.statusText,
+                { color: connectedDevice ? "#16A34A" : "#EF4444" },
+              ]}
+            >
+              {connectedDevice
+                ? `Terhubung: ${connectedDevice.name}`
+                : "Printer Belum Terhubung"}
+            </Text>
           </View>
           {connectedDevice && (
-            <TouchableOpacity onPress={disconnectPrinter} style={styles.disconnectLink}>
-                <Text style={styles.disconnectLinkText}>Putuskan</Text>
+            <TouchableOpacity
+              onPress={disconnectPrinter}
+              style={styles.disconnectLink}
+            >
+              <Text style={styles.disconnectLinkText}>Putuskan</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -299,11 +381,13 @@ export default function PrinterSettingsScreen() {
         <View style={styles.listHeaderRow}>
           <View>
             <Text style={styles.listTitle}>Daftar Perangkat</Text>
-            <Text style={styles.listSubTitle}>Cari dan pilih printer bluetooth</Text>
+            <Text style={styles.listSubTitle}>
+              Cari dan pilih printer bluetooth
+            </Text>
           </View>
-          <TouchableOpacity 
-            style={styles.scanButton} 
-            onPress={scanDevices} 
+          <TouchableOpacity
+            style={styles.scanButton}
+            onPress={scanDevices}
             disabled={loading}
             activeOpacity={0.7}
           >
@@ -333,17 +417,19 @@ export default function PrinterSettingsScreen() {
                 {loading ? "Sedang Mencari..." : "Belum Ada Perangkat"}
               </Text>
               <Text style={styles.emptySub}>
-                Pastikan printer Bluetooth menyala dan sudah dipairing di pengaturan HP.
+                Pastikan printer Bluetooth menyala dan sudah dipairing di
+                pengaturan HP.
               </Text>
             </View>
           }
         />
       </View>
-      
+
       <View style={styles.infoFooter}>
         <Ionicons name="information-circle-outline" size={16} color="#64748B" />
         <Text style={styles.infoFooterText}>
-            Bluetooth Manager memerlukan izin Lokasi untuk memindai perangkat di sekitar.
+          Bluetooth Manager memerlukan izin Lokasi untuk memindai perangkat di
+          sekitar.
         </Text>
       </View>
     </View>
@@ -385,9 +471,9 @@ const styles = StyleSheet.create({
     color: "#1E293B",
   },
   statusBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     padding: 14,
     borderRadius: 16,
     borderWidth: 1,
@@ -401,8 +487,8 @@ const styles = StyleSheet.create({
     borderColor: "#FEE2E2",
   },
   statusInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 10,
     flex: 1,
   },
@@ -428,9 +514,9 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   listHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: 20,
   },
   listTitle: {
@@ -444,8 +530,8 @@ const styles = StyleSheet.create({
     fontWeight: "500",
   },
   scanButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 6,
     padding: 8,
   },
@@ -532,8 +618,8 @@ const styles = StyleSheet.create({
   infoFooter: {
     padding: 16,
     backgroundColor: "#fff",
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 8,
     borderTopWidth: 1,
     borderTopColor: "#F1F5F9",

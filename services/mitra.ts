@@ -1,4 +1,5 @@
 import api from "./api";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export type MitraInfo = {
   id_mitra: number;
@@ -43,4 +44,32 @@ export async function updateMitraInfo(payload: {
   });
 
   return response.data;
+}
+
+export async function getCachedMitraInfo(id_mitra: number) {
+  try {
+    const cacheKey = `mitra_info_${id_mitra}`;
+    const cached = await AsyncStorage.getItem(cacheKey);
+    const now = Date.now();
+
+    if (cached) {
+      const { data, timestamp } = JSON.parse(cached);
+      // Cache valid for 5 minutes
+      if (now - timestamp < 5 * 60 * 1000) {
+        return { success: true, data };
+      }
+    }
+
+    const result = await getMitraInfo(id_mitra);
+    if (result.success && result.data) {
+      await AsyncStorage.setItem(
+        cacheKey,
+        JSON.stringify({ data: result.data, timestamp: now }),
+      );
+    }
+    return result;
+  } catch (error) {
+    console.error("GET CACHED MITRA INFO ERROR:", error);
+    return { success: false, message: "Gagal mengambil info toko" };
+  }
 }

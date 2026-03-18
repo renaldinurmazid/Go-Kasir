@@ -26,6 +26,7 @@ import {
 // Service Tambahan untuk Cetak
 import { buildStrukText } from "../../utils/strukFormatter";
 import { printStruk } from "../../services/printerService";
+import { getCachedMitraInfo } from "../../services/mitra";
 
 // --- Types ---
 type UserData = {
@@ -69,14 +70,21 @@ export default function HistoryPenjualanScreen() {
   // Filter State
   const [keyword, setKeyword] = useState("");
   const [metode, setMetode] = useState("");
-  const [dtAwal, setDtAwal] = useState(new Date(new Date().getFullYear(), new Date().getMonth(), 1));
+  const [dtAwal, setDtAwal] = useState(
+    new Date(new Date().getFullYear(), new Date().getMonth(), 1),
+  );
   const [dtAkhir, setDtAkhir] = useState(new Date());
   const [showPicker, setShowPicker] = useState({ show: false, field: "" });
 
   const [items, setItems] = useState<HistoryItem[]>([]);
 
   // Summary State
-  const [summary, setSummary] = useState({ tunai: 0, bank: 0, qris: 0, total: 0 });
+  const [summary, setSummary] = useState({
+    tunai: 0,
+    bank: 0,
+    qris: 0,
+    total: 0,
+  });
 
   // Detail State
   const [showDetailModal, setShowDetailModal] = useState(false);
@@ -95,24 +103,35 @@ export default function HistoryPenjualanScreen() {
   }, [keyword, metode, dtAwal, dtAkhir]);
 
   const formatDateDb = (date: Date) => date.toISOString().split("T")[0];
-  const formatDateIndo = (date: Date) => date.toLocaleDateString("id-ID", { day: '2-digit', month: '2-digit', year: 'numeric' });
+  const formatDateIndo = (date: Date) =>
+    date.toLocaleDateString("id-ID", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    });
 
   const initializePage = async () => {
     try {
       setLoading(true);
       const storedUser = await AsyncStorage.getItem("user_data");
-      if (!storedUser) { router.replace("/login"); return; }
+      if (!storedUser) {
+        router.replace("/login");
+        return;
+      }
       const user = JSON.parse(storedUser);
       setUserData(user);
       await fetchHistory(user.id_mitra, false);
-    } catch (e) { Alert.alert("Error", "Gagal memuat data"); }
-    finally { setLoading(false); }
+    } catch (e) {
+      Alert.alert("Error", "Gagal memuat data");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const fetchHistory = async (id_mitra: number, isRefresh: boolean) => {
     if (isRefresh) setRefreshing(true);
     else setListLoading(true);
-    
+
     try {
       const result = await getHistoryPenjualan({
         id_mitra,
@@ -127,21 +146,25 @@ export default function HistoryPenjualanScreen() {
         setItems(data);
 
         // Hitung Summary per Cara Bayar
-        const sum = data.reduce((acc, curr) => {
-          const m = curr.metode_pembayaran.toLowerCase();
-          if (m === 'tunai') acc.tunai += curr.total;
-          else if (m === 'bank') acc.bank += curr.total;
-          else if (m === 'qris') acc.qris += curr.total;
-          acc.total += curr.total;
-          return acc;
-        }, { tunai: 0, bank: 0, qris: 0, total: 0 });
-        
+        const sum = data.reduce(
+          (acc, curr) => {
+            const m = curr.metode_pembayaran.toLowerCase();
+            if (m === "tunai") acc.tunai += curr.total;
+            else if (m === "bank") acc.bank += curr.total;
+            else if (m === "qris") acc.qris += curr.total;
+            acc.total += curr.total;
+            return acc;
+          },
+          { tunai: 0, bank: 0, qris: 0, total: 0 },
+        );
+
         setSummary(sum);
       }
-    } catch (e) { console.log("Fetch Error"); }
-    finally { 
-        setRefreshing(false); 
-        setListLoading(false);
+    } catch (e) {
+      console.log("Fetch Error");
+    } finally {
+      setRefreshing(false);
+      setListLoading(false);
     }
   };
 
@@ -150,31 +173,57 @@ export default function HistoryPenjualanScreen() {
     setDetailLoading(true);
     setShowDetailModal(true);
     try {
-      const result = await getDetailPenjualan({ id_penjualan, id_mitra: userData.id_mitra });
+      const result = await getDetailPenjualan({
+        id_penjualan,
+        id_mitra: userData.id_mitra,
+      });
       if (result.success) {
         setDetailHeader(result.data?.header || null);
         setDetailItems(result.data?.items || []);
       }
-    } catch (e) { setShowDetailModal(false); }
-    finally { setDetailLoading(false); }
+    } catch (e) {
+      setShowDetailModal(false);
+    } finally {
+      setDetailLoading(false);
+    }
   };
 
   const handlePrintUlang = async () => {
     try {
-      if (!detailHeader) return;
-      const dataStruk = { ...detailHeader, items: detailItems, kasir: detailHeader.nama_lengkap };
+      if (!detailHeader || !userData?.id_mitra) return;
+
+      // Fetch Store Info
+      const mitraResult = await getCachedMitraInfo(userData.id_mitra);
+      const storeData = mitraResult.success ? mitraResult.data : {};
+
+      const dataStruk = {
+        ...detailHeader,
+        items: detailItems,
+        kasir: detailHeader.nama_lengkap,
+        nama_toko: storeData.nama_toko || detailHeader.nama_toko,
+        alamat_toko: storeData.alamat,
+        hp_toko: storeData.no_hp,
+      };
+
       const text = buildStrukText(dataStruk);
-      const result = await printStruk(text, detailHeader?.logo || null);
-      if (result.success) Alert.alert("Selesai", "Struk berhasil dicetak (Preview di Log)");
-    } catch (error) { Alert.alert("Error", "Printer tidak merespon"); }
+      const result = await printStruk(
+        text,
+        storeData.logo || detailHeader?.logo || null,
+      );
+
+      if (result.success) Alert.alert("Selesai", "Struk berhasil dicetak");
+      else Alert.alert("Printer", result.message);
+    } catch (error) {
+      Alert.alert("Error", "Printer tidak merespon");
+    }
   };
 
   return (
     <View style={styles.container}>
       <View style={styles.topHeader}>
         <View style={styles.headerTopRow}>
-          <TouchableOpacity 
-            onPress={() => router.back()} 
+          <TouchableOpacity
+            onPress={() => router.back()}
             style={styles.headerIconButton}
             activeOpacity={0.7}
           >
@@ -186,7 +235,12 @@ export default function HistoryPenjualanScreen() {
 
         <View style={styles.searchSection}>
           <View style={styles.searchBarWrapper}>
-            <Ionicons name="search" size={20} color={Colors.textSoft} style={styles.searchIcon} />
+            <Ionicons
+              name="search"
+              size={20}
+              color={Colors.textSoft}
+              style={styles.searchIcon}
+            />
             <TextInput
               style={styles.searchInput}
               placeholder="Cari transaksi..."
@@ -195,29 +249,45 @@ export default function HistoryPenjualanScreen() {
               onChangeText={setKeyword}
             />
           </View>
-          
+
           <TouchableOpacity
             style={styles.filterButton}
             onPress={() => setShowPicker({ show: true, field: "awal" })}
             activeOpacity={0.7}
           >
-            <Ionicons name="calendar-outline" size={18} color={Colors.primary} />
+            <Ionicons
+              name="calendar-outline"
+              size={18}
+              color={Colors.primary}
+            />
             <Text style={styles.filterButtonText} numberOfLines={1}>
               {formatDateIndo(dtAwal)}
             </Text>
           </TouchableOpacity>
         </View>
-        
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.metodeScroll}>
-          {['', 'tunai', 'bank', 'qris'].map((m) => (
-            <TouchableOpacity 
-              key={m} 
-              style={[styles.metodePill, metode === m && styles.metodePillActive]} 
+
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.metodeScroll}
+        >
+          {["", "tunai", "bank", "qris"].map((m) => (
+            <TouchableOpacity
+              key={m}
+              style={[
+                styles.metodePill,
+                metode === m && styles.metodePillActive,
+              ]}
               onPress={() => setMetode(m)}
               activeOpacity={0.7}
             >
-              <Text style={[styles.metodePillText, metode === m && styles.metodePillTextActive]}>
-                {m === '' ? 'Semua' : m.toUpperCase()}
+              <Text
+                style={[
+                  styles.metodePillText,
+                  metode === m && styles.metodePillTextActive,
+                ]}
+              >
+                {m === "" ? "Semua" : m.toUpperCase()}
               </Text>
             </TouchableOpacity>
           ))}
@@ -240,15 +310,21 @@ export default function HistoryPenjualanScreen() {
         <View style={styles.summaryGrid}>
           <View style={styles.summaryBox}>
             <Text style={styles.summaryLabel}>Total Omzet</Text>
-            <Text style={styles.summaryValue}>{formatRupiah(summary.total)}</Text>
+            <Text style={styles.summaryValue}>
+              {formatRupiah(summary.total)}
+            </Text>
           </View>
           <View style={styles.summaryBox}>
             <Text style={styles.summaryLabel}>Tunai</Text>
-            <Text style={[styles.summaryValue, { color: '#16A34A' }]}>{formatRupiah(summary.tunai)}</Text>
+            <Text style={[styles.summaryValue, { color: "#16A34A" }]}>
+              {formatRupiah(summary.tunai)}
+            </Text>
           </View>
           <View style={styles.summaryBox}>
             <Text style={styles.summaryLabel}>Non-Tunai</Text>
-            <Text style={[styles.summaryValue, { color: '#2563EB' }]}>{formatRupiah(summary.bank + summary.qris)}</Text>
+            <Text style={[styles.summaryValue, { color: "#2563EB" }]}>
+              {formatRupiah(summary.bank + summary.qris)}
+            </Text>
           </View>
         </View>
 
@@ -268,33 +344,53 @@ export default function HistoryPenjualanScreen() {
           </View>
         ) : items.length > 0 ? (
           items.map((item) => (
-            <TouchableOpacity 
-              key={item.id_penjualan} 
+            <TouchableOpacity
+              key={item.id_penjualan}
               style={styles.transactionCard}
               onPress={() => handleOpenDetail(item.id_penjualan)}
               activeOpacity={0.7}
             >
               <View style={styles.cardHeader}>
                 <View style={styles.iconContainer}>
-                  <Ionicons name="receipt-outline" size={24} color={Colors.primary} />
+                  <Ionicons
+                    name="receipt-outline"
+                    size={24}
+                    color={Colors.primary}
+                  />
                 </View>
-                
+
                 <View style={styles.cardMainInfo}>
                   <View style={styles.titleRow}>
                     <Text style={styles.invoiceNo}>#{item.id_penjualan}</Text>
-                    <View style={[
-                      styles.methodBadge,
-                      { backgroundColor: item.metode_pembayaran.toLowerCase() === 'tunai' ? '#F0FDF4' : '#EFF6FF' }
-                    ]}>
-                      <Text style={[
-                        styles.methodBadgeText,
-                        { color: item.metode_pembayaran.toLowerCase() === 'tunai' ? '#16A34A' : '#2563EB' }
-                      ]}>
+                    <View
+                      style={[
+                        styles.methodBadge,
+                        {
+                          backgroundColor:
+                            item.metode_pembayaran.toLowerCase() === "tunai"
+                              ? "#F0FDF4"
+                              : "#EFF6FF",
+                        },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.methodBadgeText,
+                          {
+                            color:
+                              item.metode_pembayaran.toLowerCase() === "tunai"
+                                ? "#16A34A"
+                                : "#2563EB",
+                          },
+                        ]}
+                      >
                         {item.metode_pembayaran.toUpperCase()}
                       </Text>
                     </View>
                   </View>
-                  <Text style={styles.cardSubText}>{item.tanggal} • {item.nama_lengkap}</Text>
+                  <Text style={styles.cardSubText}>
+                    {item.tanggal} • {item.nama_lengkap}
+                  </Text>
                 </View>
               </View>
 
@@ -302,7 +398,9 @@ export default function HistoryPenjualanScreen() {
 
               <View style={styles.amountRow}>
                 <Text style={styles.amountLabel}>Total Pembayaran</Text>
-                <Text style={styles.amountValue}>{formatRupiah(item.total)}</Text>
+                <Text style={styles.amountValue}>
+                  {formatRupiah(item.total)}
+                </Text>
               </View>
             </TouchableOpacity>
           ))
@@ -312,7 +410,9 @@ export default function HistoryPenjualanScreen() {
               <Ionicons name="search" size={48} color="#E2E8F0" />
             </View>
             <Text style={styles.emptyTitle}>Transaksi Tidak Ditemukan</Text>
-            <Text style={styles.emptySub}>Coba cari dengan kata kunci atau periode lain.</Text>
+            <Text style={styles.emptySub}>
+              Coba cari dengan kata kunci atau periode lain.
+            </Text>
           </View>
         )}
         <View style={{ height: 100 }} />
@@ -320,34 +420,49 @@ export default function HistoryPenjualanScreen() {
 
       {/* Modal Detail */}
       <Modal visible={showDetailModal} transparent animationType="slide">
-        <Pressable style={styles.modalOverlay} onPress={() => setShowDetailModal(false)}>
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => setShowDetailModal(false)}
+        >
           <Pressable style={styles.modalBox} onPress={() => {}}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Detail Transaksi</Text>
-              <TouchableOpacity onPress={() => setShowDetailModal(false)} style={styles.headerIconButton}>
+              <TouchableOpacity
+                onPress={() => setShowDetailModal(false)}
+                style={styles.headerIconButton}
+              >
                 <Ionicons name="close" size={24} color={Colors.text} />
               </TouchableOpacity>
             </View>
 
             {detailLoading ? (
-              <View style={{ padding: 40, alignItems: 'center' }}>
+              <View style={{ padding: 40, alignItems: "center" }}>
                 <ActivityIndicator color={Colors.primary} />
               </View>
             ) : (
-              <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
+              <ScrollView
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={{ paddingBottom: 40 }}
+              >
                 {detailHeader && (
                   <View style={styles.detailHeaderSection}>
                     <View style={styles.detailInfoItem}>
                       <Text style={styles.detailLabel}>No. Invoice</Text>
-                      <Text style={styles.detailValue}>#{detailHeader.id_penjualan}</Text>
+                      <Text style={styles.detailValue}>
+                        #{detailHeader.id_penjualan}
+                      </Text>
                     </View>
                     <View style={styles.detailInfoItem}>
                       <Text style={styles.detailLabel}>Tanggal</Text>
-                      <Text style={styles.detailValue}>{detailHeader.tanggal}</Text>
+                      <Text style={styles.detailValue}>
+                        {detailHeader.tanggal}
+                      </Text>
                     </View>
                     <View style={styles.detailInfoItem}>
                       <Text style={styles.detailLabel}>Kasir</Text>
-                      <Text style={styles.detailValue}>{detailHeader.nama_lengkap}</Text>
+                      <Text style={styles.detailValue}>
+                        {detailHeader.nama_lengkap}
+                      </Text>
                     </View>
                   </View>
                 )}
@@ -357,25 +472,41 @@ export default function HistoryPenjualanScreen() {
                   <View key={item.id_detail} style={styles.detailItemRow}>
                     <View style={{ flex: 1 }}>
                       <Text style={styles.itemName}>{item.nama_produk}</Text>
-                      <Text style={styles.itemSub}>{item.qty} x {formatRupiah(item.harga)}</Text>
+                      <Text style={styles.itemSub}>
+                        {item.qty} x {formatRupiah(item.harga)}
+                      </Text>
                     </View>
-                    <Text style={styles.itemTotal}>{formatRupiah(item.total)}</Text>
+                    <Text style={styles.itemTotal}>
+                      {formatRupiah(item.total)}
+                    </Text>
                   </View>
                 ))}
 
                 <View style={styles.totalSection}>
-                   <View style={styles.totalRow}>
-                      <Text style={styles.totalLabel}>Grand Total</Text>
-                      <Text style={styles.totalValue}>{formatRupiah(detailHeader?.total)}</Text>
-                   </View>
-                   <View style={styles.totalRow}>
-                      <Text style={styles.paymentLabel}>Metode Bayar</Text>
-                      <Text style={styles.paymentValue}>{detailHeader?.metode_pembayaran?.toUpperCase()}</Text>
-                   </View>
+                  <View style={styles.totalRow}>
+                    <Text style={styles.totalLabel}>Grand Total</Text>
+                    <Text style={styles.totalValue}>
+                      {formatRupiah(detailHeader?.total)}
+                    </Text>
+                  </View>
+                  <View style={styles.totalRow}>
+                    <Text style={styles.paymentLabel}>Metode Bayar</Text>
+                    <Text style={styles.paymentValue}>
+                      {detailHeader?.metode_pembayaran?.toUpperCase()}
+                    </Text>
+                  </View>
                 </View>
 
-                <TouchableOpacity style={styles.submitButton} onPress={handlePrintUlang}>
-                  <Ionicons name="print" size={22} color="#fff" style={{ marginRight: 8 }} />
+                <TouchableOpacity
+                  style={styles.submitButton}
+                  onPress={handlePrintUlang}
+                >
+                  <Ionicons
+                    name="print"
+                    size={22}
+                    color="#fff"
+                    style={{ marginRight: 8 }}
+                  />
                   <Text style={styles.submitButtonText}>Cetak Ulang Struk</Text>
                 </TouchableOpacity>
               </ScrollView>
@@ -510,7 +641,7 @@ const styles = StyleSheet.create({
   },
   summaryBox: {
     flex: 1,
-    minWidth: '45%',
+    minWidth: "45%",
     backgroundColor: "#fff",
     borderRadius: 20,
     padding: 16,
@@ -712,7 +843,7 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     color: "#475569",
     marginBottom: 12,
-    textTransform: 'uppercase',
+    textTransform: "uppercase",
     letterSpacing: 0.5,
   },
   detailItemRow: {
@@ -773,7 +904,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primary,
     height: 56,
     borderRadius: 16,
-    flexDirection: 'row',
+    flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
     marginTop: 32,
