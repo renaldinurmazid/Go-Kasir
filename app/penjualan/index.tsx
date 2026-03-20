@@ -10,6 +10,8 @@ import {
   Alert,
   ActivityIndicator,
   RefreshControl,
+  Modal,
+  Pressable,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -54,6 +56,7 @@ export default function PenjualanScreen() {
   const [kategoriList, setKategoriList] = useState<string[]>(["Semua"]);
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [showCartDetail, setShowCartDetail] = useState(false);
 
   const {
     items,
@@ -334,10 +337,7 @@ export default function PenjualanScreen() {
         <View style={styles.bottomCheckoutBar}>
           <TouchableOpacity 
             style={styles.cartSummaryTrigger}
-            onPress={() => {
-              // Toggle cart list detail logic can go here if needed
-              // For now, let's keep it clean
-            }}
+            onPress={() => setShowCartDetail(true)}
           >
             <View style={styles.cartBadgeWrapper}>
               <View style={styles.cartIconCircle}>
@@ -363,6 +363,109 @@ export default function PenjualanScreen() {
           </TouchableOpacity>
         </View>
       )}
+
+      {/* Cart Detail Bottom Sheet */}
+      <Modal
+        visible={showCartDetail}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowCartDetail(false)}
+      >
+        <Pressable 
+          style={styles.modalOverlay} 
+          onPress={() => setShowCartDetail(false)}
+        >
+          <View 
+            style={styles.sheetContainer}
+            onStartShouldSetResponder={() => true}
+            onTouchEnd={(e) => e.stopPropagation()}
+          >
+            <View style={styles.sheetHandle} />
+            
+            <View style={styles.sheetHeader}>
+              <View>
+                <Text style={styles.sheetTitle}>Detail Pesanan</Text>
+                <Text style={styles.sheetSubTitle}>{totalItems()} Item Terpilih</Text>
+              </View>
+              <TouchableOpacity 
+                style={styles.sheetCloseBtn}
+                onPress={() => setShowCartDetail(false)}
+              >
+                <Ionicons name="close" size={24} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView 
+              style={styles.sheetScroll}
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={styles.sheetScrollContent}
+            >
+              {items.map((item) => (
+                <View key={item.id_produk} style={styles.cartItemRow}>
+                  <View style={styles.cartItemIconBox}>
+                    {item.gambar ? (
+                      <Image source={{ uri: item.gambar }} style={styles.cartItemImg} />
+                    ) : (
+                      <Ionicons name="cube-outline" size={20} color="#94A3B8" />
+                    )}
+                  </View>
+
+                  <View style={styles.cartItemInfo}>
+                    <Text style={styles.cartItemName} numberOfLines={1}>
+                      {item.nama_produk}
+                    </Text>
+                    <Text style={styles.cartItemPrice}>
+                      {formatRupiah(item.harga)}
+                    </Text>
+                  </View>
+
+                  <View style={styles.cartItemActions}>
+                    <View style={styles.qtyControls}>
+                      <TouchableOpacity 
+                        style={styles.qtyBtn}
+                        onPress={() => decreaseQty(item.id_produk)}
+                      >
+                        <Ionicons name="remove" size={16} color="#1E293B" />
+                      </TouchableOpacity>
+                      <Text style={styles.qtyText}>{item.qty}</Text>
+                      <TouchableOpacity 
+                        style={styles.qtyBtn}
+                        onPress={() => increaseQty(item.id_produk)}
+                      >
+                        <Ionicons name="add" size={16} color="#1E293B" />
+                      </TouchableOpacity>
+                    </View>
+                    
+                    <TouchableOpacity 
+                      style={styles.itemRemoveBtn}
+                      onPress={() => removeItem(item.id_produk)}
+                    >
+                      <Ionicons name="trash-outline" size={18} color="#EF4444" />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ))}
+            </ScrollView>
+
+            <View style={styles.sheetFooter}>
+              <View style={styles.sheetTotalRow}>
+                <Text style={styles.sheetTotalLabel}>Total Tagihan</Text>
+                <Text style={styles.sheetTotalValue}>{formatRupiah(totalAmount())}</Text>
+              </View>
+              <TouchableOpacity 
+                style={styles.sheetCheckoutBtn}
+                onPress={() => {
+                  setShowCartDetail(false);
+                  handleBayar();
+                }}
+              >
+                <Text style={styles.sheetCheckoutBtnText}>Lanjut Pembayaran</Text>
+                <Ionicons name="arrow-forward" size={18} color="#fff" />
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -680,5 +783,180 @@ const styles = StyleSheet.create({
     color: "#64748B",
     textAlign: "center",
     paddingHorizontal: 40,
+  },
+
+  // Sheet Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "flex-end",
+  },
+  sheetContainer: {
+    backgroundColor: "#fff",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    minHeight: "40%",
+    maxHeight: "80%",
+    paddingBottom: 40,
+  },
+  sheetHandle: {
+    width: 40,
+    height: 4,
+    backgroundColor: "#E2E8F0",
+    borderRadius: 2,
+    alignSelf: "center",
+    marginTop: 12,
+    marginBottom: 8,
+  },
+  sheetHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F1F5F9",
+  },
+  sheetTitle: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: "#1E293B",
+  },
+  sheetSubTitle: {
+    fontSize: 12,
+    color: "#64748B",
+    fontWeight: "500",
+  },
+  sheetCloseBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "#F1F5F9",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  sheetScroll: {
+    flexGrow: 0,
+  },
+  sheetScrollContent: {
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+  },
+  cartItemRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 16,
+    backgroundColor: "#F8FAFC",
+    padding: 12,
+    borderRadius: 16,
+  },
+  cartItemIconBox: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    backgroundColor: "#fff",
+    justifyContent: "center",
+    alignItems: "center",
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "#F1F5F9",
+  },
+  cartItemImg: {
+    width: "100%",
+    height: "100%",
+    resizeMode: "cover",
+  },
+  cartItemInfo: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  cartItemName: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#1E293B",
+    marginBottom: 2,
+  },
+  cartItemPrice: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: Colors.primary,
+  },
+  cartItemActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  qtyControls: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#fff",
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    paddingHorizontal: 4,
+    paddingVertical: 4,
+  },
+  qtyBtn: {
+    width: 28,
+    height: 28,
+    justifyContent: "center",
+    alignItems: "center",
+    borderRadius: 8,
+  },
+  qtyText: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#1E293B",
+    minWidth: 24,
+    textAlign: "center",
+  },
+  itemRemoveBtn: {
+    width: 32,
+    height: 32,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#FEF2F2",
+    borderRadius: 8,
+  },
+  sheetFooter: {
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: "#F1F5F9",
+  },
+  sheetTotalRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  sheetTotalLabel: {
+    fontSize: 14,
+    color: "#64748B",
+    fontWeight: "600",
+  },
+  sheetTotalValue: {
+    fontSize: 20,
+    fontWeight: "800",
+    color: "#1E293B",
+  },
+  sheetCheckoutBtn: {
+    backgroundColor: Colors.primary,
+    flexDirection: "row",
+    height: 54,
+    borderRadius: 16,
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 10,
+    shadowColor: Colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  sheetCheckoutBtnText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "700",
   },
 });
